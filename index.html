@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="path/to/your/app-icon.png">
+<link rel="icon" type="image/png" sizes="512x512" href="app-icon.png">
+<link rel="apple-touch-icon" href="app-icon.png">
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+</script>
+
+    <title>Stock-Master Ultra</title>
+    <link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBd83Jk5n7M2mkumtFT-t_zktD8Wz0cZnM",
+  authDomain: "stockmaster-94534.firebaseapp.com",
+  projectId: "stockmaster-94534",
+  storageBucket: "stockmaster-94534.firebasestorage.app",
+  messagingSenderId: "520506980567",
+  appId: "1:520506980567:web:e5d7661a3866d18d979892"
+};
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  
+  // SPCK Connection Fix:
+// SPCK Connection Fix:
+</script>
+</head>
+<body>
+<div id="loadingOverlay" class="loader-wrapper" style="display: none;">
+    <div class="loader"></div>
+    <p id="loaderText">Processing...</p> </div>
+
+    <div class="container">
+        <div id="adminView" class="view">
+            <div class="top-bar">
+                <h2>📦 Stock-Master</h2>
+                <div class="top-actions">
+                    <button class="btn-icon-top" onclick="toggleSearch()">🔍</button>
+                    <button id="bucketTrigger" class="btn-icon-top bucket-nav" onclick="showBucketScreen()">
+                        🛒 <span id="bucketBadge">0</span>
+                    </button>
+                    <div class="menu-container">
+                        <button class="btn-icon-top" onclick="toggleMenu()">⋮</button>
+                        <div id="dropMenu" class="dropdown-menu" style="display: none;">
+                            <button onclick="showAddModal()">➕ New Item</button>
+                            <button onclick="showHistoryScreen()">📜 History</button>
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="header-row">
+                <div id="breadcrumb" class="breadcrumb"></div>
+            </div>
+
+            <div id="searchWrapper" class="search-box" style="display: none;">
+                <input type="text" id="searchInput" placeholder="Search to add to bucket..." oninput="handleSearch()">
+            </div>
+
+<div id="displayArea" class="list-container">
+
+</div>
+
+            <div id="selectionBar" class="selection-floating-bar" style="display: none;">
+                <div class="selection-info">
+                    <span id="selectCount">0</span>
+                    <small>Selected</small>
+                </div>
+                <div class="bar-btns">
+                    <button id="editBtn" class="action-item" onclick="startEditFromBar()">
+                        <span>✏️</span><label>Edit</label>
+                    </button>
+                    <button class="action-item" onclick="deleteMultiple()">
+                        <span>🗑️</span><label>Delete</label>
+                    </button>
+                    <button id="bulkBucketBtn" class="action-item" onclick="bulkAddToBucket()">
+                        <span>📥</span><label>Bucket</label>
+                    </button>
+                    <button class="btn-close-bar" onclick="clearSelection()">✕</button>
+                </div>
+            </div>
+        </div>
+
+      <div id="addModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3 id="modalTitle">Add New Inventory</h3>
+                <small>To add sub-category, use '>' symbol (e.g. Chips > Lays).</small>
+                <textarea id="masterInput" placeholder="Lays, Bingo, Crax"></textarea>
+                <div class="modal-btns">
+                    <button id="mainBtn" class="btn-primary" onclick="handleMasterAdd()">Save Item</button>
+                    <button class="btn-secondary" onclick="hideAddModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="bucketView" class="view" style="display: none;">
+            <div class="view-header">
+                <h3>🛒 My Bucket</h3>
+                <button class="btn-close-view" onclick="hideBucketScreen()">✕</button>
+            </div>
+            <div id="bucketItemsList" class="order-list"></div>
+            <button class="btn-main-action" onclick="downloadAndSave()">Confirm & Download</button>
+        </div>
+
+        <div id="historyView" class="view" style="display: none;">
+            <div class="view-header">
+                <h3>📜 Order History</h3>
+                <button onclick="clearHistory()" class="clear-btn">
+    🗑 Clear History
+</button>
+                <button class="btn-close-view" onclick="hideHistoryScreen()">✕</button>
+            </div>
+            <div id="historyList" class="history-list"></div>
+        </div>
+    </div>
+
+
+    <script src="script.js" defer></script>
+<div id="image-capture-container" style="position: absolute; top: 0; left: 0; width: 400px; z-index: -1; visibility: hidden;"></div>
+</body>
+</html>

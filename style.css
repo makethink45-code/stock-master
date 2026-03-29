@@ -1,0 +1,749 @@
+/* --- 1. System Variables (Theme) --- */
+/*@import url('https://fonts.googleapis.com/css2?family=Iosevka+Fixed:wght@400;700&display=swap');*/
+
+:root {
+    --primary: #2563eb;      /* Professional Blue */
+    --primary-dark: #1d4ed8;
+    --success: #059669;      
+    --danger: #e11d48;       
+    --dark: #0f172a;         
+    --text-main: #1e293b;    
+    --text-sec: #64748b;     
+    --bg-main: #f8fafc;      /* Aur bhi clean light grey */
+    --border-base: #e2e8f0;
+    --font-main: 'Iosevka Fixed', monospace;
+
+}
+/* Iosevka style font import */
+
+
+
+/* Inputs ke liye special selection allow karein taaki copy-paste ho sake */
+input, textarea {
+    user-select: text !important;
+    font-family: var(--font-main) !important;
+}
+
+/* Poori app se blue tap highlight aur text selection hatane ke liye */
+
+/* Sirf inputs aur textareas mein selection allow karein taaki typing ho sake */
+input, textarea {
+    user-select: text !important;
+    -webkit-tap-highlight-color: rgba(0,0,0,0.05); 
+}
+
+/* Long press feedback ke liye ek halka animation */
+.item-card:active {
+    transform: scale(0.98);
+    background-color: #f1f5f9;
+    transition: 0.1s;
+}
+
+
+* { 
+      -webkit-tap-highlight-color: transparent; /* Blue color hatane ke liye */
+    -webkit-touch-callout: none;  
+        user-select: none !important;
+    -webkit-user-select: none !important;
+    /* iOS menu hatane ke liye */
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    color: var(--text-main);
+    /*font-family: 'Inter', system-ui, -apple-system, sans-serif !important;*/
+    -webkit-font-smoothing: antialiased;
+      /* font-family: var(--font-main) !important; */
+     font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace !important;
+}
+input{
+    user-select: text !important;
+}
+body { 
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden; /* Bahar ka scroll bilkul band */
+    background-color: var(--bg-main);
+    display: flex;
+    justify-content: center;
+}
+
+.container { 
+    width: 100%; 
+    max-width: 450px; 
+    background: white; 
+    /* 100dvh (Dynamic Viewport Height) mobile ke liye best hai */
+    height: 100dvh; 
+    display: flex; 
+    flex-direction: column; 
+    position: relative;
+    overflow: hidden;
+    padding: 18px;
+}
+.list-container, 
+.order-list, 
+.history-list { 
+    flex: 1;            /* Ye area bachi hui poori jagah le lega */
+    overflow-y: auto;   /* Sirf yahi area scroll hoga */
+    padding-bottom: 80px; /* Selection bar ke liye niche jagah chhodein */
+    -webkit-overflow-scrolling: touch; /* Mobile par smooth scroll ke liye */
+}
+/* --- 2. Top Bar & Branding --- */
+.top-bar { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 12px; 
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-base);
+}
+
+h2 { font-size: 1.25rem; font-weight: 800; color: var(--dark); display: flex; align-items: center; gap: 8px; }
+h2 span { font-size: 1.4rem; } /* For 📦 icon */
+
+.top-actions { display: flex; gap: 10px; align-items: center; }
+
+.btn-icon-top { 
+    border: none; 
+    padding: 10px; 
+    border-radius: 12px; 
+    font-size: 1rem; 
+    cursor: pointer; 
+    background: #e2e8f0;
+    color: var(--dark);
+    transition: all 0.2s ease;
+}
+.btn-icon-top:hover { background: #cbd5e1; }
+.btn-icon-top:active { transform: scale(0.95); }
+
+.bucket-nav { 
+    background: var(--primary); 
+    color: white; 
+    position: relative; 
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.bucket-nav:hover { background: var(--primary-dark); }
+.bucket-nav #bucketBadge { 
+    position: absolute; 
+    top: -6px; 
+    right: -6px; 
+    background: var(--danger); 
+    color: white; 
+    font-size: 0.65rem; 
+    padding: 3px 6px; 
+    border-radius: 50%; 
+    font-weight: bold;
+}
+
+/* --- 3. 3-Dot Dropdown Menu --- */
+.menu-container { position: relative; }
+.dropdown-menu {
+    position: absolute; 
+    right: 0; 
+    top: 48px; 
+    background: white; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12); 
+    border-radius: 16px; 
+    z-index: 5000; 
+    min-width: 190px; 
+    overflow: hidden;
+    border: 1px solid var(--border-base);
+}
+.dropdown-menu button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%; 
+    padding: 14px 18px; 
+    border: none; 
+    background: none; 
+    text-align: left; 
+    font-size: 0.95rem; 
+    color: var(--dark);
+    transition: all 0.2s ease;
+}
+.dropdown-menu button:hover { background: var(--bg-main); color: var(--primary); }
+.dropdown-menu button:active { background: #e2e8f0; }
+
+/* --- 4. Breadcrumb & Search --- */
+.breadcrumb { 
+    background: var(--bg-main); 
+    padding: 14px; 
+    border-radius: 16px; 
+    font-size: 0.85rem; 
+    border: 1px solid var(--border-base); 
+    white-space: nowrap; 
+    overflow-x: auto; 
+    margin-bottom: 15px;
+    color: var(--text-sec);
+}
+.crumb-link { color: var(--primary); cursor: pointer; font-weight: 700; text-decoration: none; transition: 0.2s; }
+.crumb-link:hover { color: var(--primary-dark); text-decoration: underline; }
+
+.search-box { margin-bottom: 15px; }
+#searchInput { 
+    width: 100%; 
+    padding: 14px; 
+    border: 2px solid var(--border-base); 
+    border-radius: 16px; 
+    outline: none; 
+    transition: 0.2s;
+    font-size: 1rem;
+}
+#searchInput:focus { border-color: var(--primary); background: #fdfdfd; }
+
+/* --- 5. Inventory List Cards --- */
+.list-container { 
+    flex: 1; 
+    overflow-y: auto; 
+    margin-bottom: 75px; /* Space for floating bar */
+}
+
+.item-card { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid #edf2f7;
+    /* Clean shadow */
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    margin-bottom: 8px; 
+    box-shadow: var(--card-shadow);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+.item-card:hover { border-color: #cbd5e1; }
+.item-card.multi-selected { 
+    background: #eff6ff; 
+    border: 2px solid #3b82f6; 
+}
+
+.item-name { display: flex; align-items: center; gap: 12px;
+}
+.item-name span.icon { font-size: 1.2rem; }
+.item-name span.text { font-weight: 600; font-size: 1rem; color: var(--dark); }
+
+.btn-bucket-add { 
+    background: #fdfdfd; 
+    border: 2px solid var(--success); 
+    color: var(--success);
+    padding: 8px 12px; 
+    border-radius: 12px; 
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+}
+.btn-bucket-add:hover { background: #f0fdf4; color: #15803d; }
+.added-label { color: var(--success); font-weight: bold; font-size: 0.95rem; padding: 8px; }
+
+/* --- Floating Bar Upgrade --- */
+.selection-floating-bar { 
+    position: absolute; 
+    bottom: 15px; 
+    left: 10px; 
+    right: 10px; 
+    background: #1e293b; 
+    z-index: 1000;
+    color: white; 
+    padding: 8px 12px; 
+    border-radius: 20px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    z-index: 1000;
+}
+
+.selection-info { 
+    display: flex; flex-direction: column; align-items: center;
+    padding-right: 15px; border-right: 1px solid rgba(255,255,255,0.2);
+    min-width: 60px;
+}
+#selectCount { font-size: 1.3rem; font-weight: 800; color: #6366f1; line-height: 1; }
+.selection-info small { font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; margin-top: 2px; }
+
+.bar-btns { 
+    display: flex; flex: 1; justify-content: space-evenly; align-items: center; 
+    gap: 5px; padding: 0 10px;
+}
+
+.action-item { 
+    background: none; border: none; 
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    cursor: pointer; transition: 0.2s; min-width: 50px;
+}
+.action-item:active { transform: scale(0.9); }
+.action-item span { font-size: 1.2rem; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5)); }
+.action-item label { 
+    font-size: 0.6rem; color: #cbd5e1; font-weight: 600; 
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+.btn-close-bar { 
+    background: rgba(255,255,255,0.1); border: none; color: white; 
+    width: 35px; height: 35px; border-radius: 50%; 
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+
+/* --- 7. Modal & Views --- */
+.modal { 
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px);
+    display: flex; justify-content: center; align-items: center; z-index: 9999; 
+}
+.modal-content { background: white; padding: 20px; border-radius: 20px; width: 90%; max-width: 400px; box-shadow: 0 15px 50px rgba(0,0,0,0.15);}
+.modal-content h3 { font-size: 1.2rem; font-weight: 800; color: var(--dark); margin-bottom: 20px; }
+.modal textarea { margin-bottom: 20px; font-size: 0.95rem;}
+
+.modal-btns { display: flex; gap: 10px; }
+
+
+
+.view {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-base); }
+.view-header h3 { font-size: 1.2rem; font-weight: 800; color: var(--dark); }
+.btn-close-view { background: none; border: none; font-size: 1.2rem; padding: 10px; cursor: pointer;}
+
+/* Bucket & Qty Input */
+order-row { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    background: #fff;
+    margin-bottom: 0; /* Cards ke beech ka gap khatam */
+    padding: 8px 12px !important; 
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+.order-row strong { color: var(--dark); font-weight: 700; 
+    font-size: 0.9rem;
+}
+.order-row small { font-size: 0.7rem; color: #888; }
+
+.qty-input { width: 60px; padding: 6px; border: 1px solid var(--border-base); border-radius: 6px; text-align: center; font-weight: bold; font-size: 0.9rem; height: 35px;}
+.qty-input:focus { border-color: var(--primary); }
+
+.btn-main-action { 
+    width: 100%; background: var(--primary); color: white; padding: 18px; 
+    border-radius: 18px; border: none; font-weight: bold; font-size: 1rem; margin-top: 20px; 
+    cursor: pointer; transition: 0.2s;
+}
+.btn-main-action:hover { background: var(--primary-dark); }
+.btn-main-action:active { transform: scale(0.98); }
+
+.btn-primary { width: 100%; background: var(--primary); color: white; padding: 14px; border-radius: 14px; border: none; font-weight: bold; cursor: pointer;}
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { width: 100%; background: var(--bg-main); color: var(--dark); padding: 14px; border-radius: 14px; border: none; font-weight: bold; cursor: pointer;}
+.btn-secondary:hover { background: #cbd5e1; }
+
+
+/* --- New Professional History UI --- */
+.history-list {
+    padding: 10px 0;
+}
+
+.history-card-new {
+    background: #ffffff;
+    border: 1px solid #edf2f7;
+    border-radius: 16px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.h-header {
+    background: #f8fafc;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #edf2f7;
+}
+
+
+.h-date {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--dark);
+}
+
+.h-time {
+    font-size: 0.75rem;
+    color: var(--text-sec);
+}
+
+.h-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary);
+    background: #eef2ff;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+.h-body {
+    padding: 5px 12px;
+}
+
+.h-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.h-row:last-child {
+    border-bottom: none;
+}
+
+.h-name {
+    font-size: 0.9rem;
+    color: #475569;
+}
+
+.h-qty {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--dark);
+}
+
+/* Clear History Button Redesign */
+.clear-btn {
+    background: #fff1f2;
+    color: #e11d48;
+    border: 1px solid #ffe4e6;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.clear-btn:hover {
+    background: #ffe4e6;
+}
+
+/* Fix for the new Inline '+' Button */
+.add-sub-inline {
+    background: var(--primary-light);
+    color: var(--primary);
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-weight: bold;
+    margin-right: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+/* Fix for Bucket View Buttons */
+.order-list .btn-icon-top {
+    background: #fee2e2;
+    color: var(--danger);
+    padding: 5px 10px;
+    font-weight: bold;
+}
+
+/* Floating Bar Label spacing */
+.action-item label {
+    font-size: 0.65rem;
+    margin-top: 2px;
+    font-weight: 700;
+}
+/* style.css mein update karein */
+#addModal .modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#addModal h3 {
+    margin-bottom: 2px;
+}
+
+#addModal small {
+    display: block;
+    margin-bottom: 10px;
+    color: var(--text-sec);
+    font-size: 0.85rem;
+}
+
+#masterInput {
+    border: 2px solid var(--border-base);
+    border-radius: 12px;
+    min-height: 100px;
+    padding: 12px;
+    font-size: 1rem;
+    width: 100%;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+.breadcrumb {
+    padding: 8px 12px; 
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+    background: var(--bg-main);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+}
+
+.crumb-link {
+    color: var(--primary);
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.breadcrumb-separator {
+    color: var(--text-sec);
+    padding: 0 4px;
+}
+
+/* Modal text overlap fix */
+.modal-content small {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.8rem;
+    color: var(--text-sec);
+}
+/* style.css mein purane grouping styles ko isse replace karein */
+
+.bucket-group-card {
+    background: #ffffff;
+    border: 1px solid var(--border-base);
+    margin-bottom: 15px !important;
+    border-radius: 12px !important;
+    padding: 0; /* Clear padding for capture safety */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.02); /* Sober shadow */
+    overflow: hidden;
+    
+    /* Image consistency fix: Ensures uniformity in width and some height */
+    min-width: 320px; 
+    transition: var(--transition);
+}
+
+.bucket-group-card .group-header {
+    background: #fdfdfd; /* White base */
+    color: var(--primary);
+    padding: 16px 20px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 2px solid var(--bg-main); /* Light separator */
+}
+
+.group-header {
+    background: #ffffff;
+    color: var(--primary);
+    padding: 15px 0;
+    font-weight: 800;
+    font-size: 1.1rem;
+    border-bottom: 2px solid #f1f5f9;
+    margin-bottom: 15px;
+}
+
+
+.bucket-group-card .group-body {
+    padding: 10px 20px 20px 20px;
+}
+
+/* Image quality improvements for capture */
+.items-to-capture {
+    background: white;
+    font-size: 0.9rem;
+}
+
+.items-to-capture strong {
+    color: var(--dark);
+    font-size: 0.95rem;
+}
+
+.items-to-capture small {
+    color: var(--text-sec);
+    font-size: 0.75rem;
+}
+
+/* Skeleton Container */
+.loading-wrapper {
+    padding: 10px;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: white; /* Main page content chhupane ke liye */
+}
+
+/* Skeleton Base */
+
+.skeleton {
+    background: #f1f5f9;
+    background-image: linear-gradient(90deg, #f1f5f9 0px, #e2e8f0 40px, #f1f5f9 80px);
+    background-size: 600px 100%;
+    animation: skeleton-shimmer 1.2s infinite linear;
+    border-radius: 16px;
+    margin-bottom: 12px;
+    height: 70px; /* Item card ki height */
+    width: 100%;
+}
+
+@keyframes skeleton-shimmer {
+    0% { background-position: -100px 0; }
+    100% { background-position: 500px 0; }
+}
+
+.product-title {
+  font-weight: bold;
+  margin-top: 8px;
+  color: #444;
+}
+.clear-btn {
+  background: red;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin: 10px;
+  cursor: pointer;
+}
+
+
+.h-item-container {
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.h-item-container:last-child {
+    border-bottom: none;
+}
+
+.h-full-path {
+    font-size: 0.7rem;
+    color: var(--primary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 2px;
+    opacity: 0.8;
+}
+
+.h-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.h-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--dark);
+}
+
+.h-qty {
+    font-weight: 800;
+    color: var(--text-sec);
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+}
+/* --- Professional Loader Styles --- */
+.loader-wrapper {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+}
+
+.loader {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loader-wrapper p {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--primary);
+}
+/* --- Professional Capture UI (Based on Screenshot) --- */
+
+
+
+.cap-section-body {
+    padding: 15px;
+}
+
+
+.cap-card:last-child { margin-bottom: 0; }
+
+/* Container ko hide karne ka naya tareeka taaki rendering block na ho */
+#image-capture-container {
+    position: fixed;
+    top: 10px;    /* 0 ke bajaye thoda gap dein */
+    left: -2000px; /* Isse screen se bahar rahega par render hoga */
+    z-index: -999;
+    background: transparent;
+    pointer-events: none;
+}
+
+/* Bucket list ko compact banane ke liye */
+.order-row { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 8px 12px; /* Padding kam kar di */
+    border-bottom: 1px solid #eee; 
+    background: #fff;
+    margin-bottom: 0; /* Cards ke beech ka gap khatam */
+}
+
+.order-row strong { font-size: 0.9rem; } /* Text thoda chota */
+.order-row small { font-size: 0.7rem; color: #888; }
+
+.qty-input { 
+    width: 60px; 
+    padding: 6px; 
+    border: 1px solid #ccc; 
+    border-radius: 6px; 
+    font-size: 0.9rem;
+    height: 35px;
+}
+
+.bucket-group-card {
+    margin-bottom: 15px !important;
+    border-radius: 12px !important;
+}
