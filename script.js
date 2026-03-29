@@ -167,7 +167,7 @@ async function clearHistory() {
     }
 }
 
-async function downloadAndSave() {
+/*async function downloadAndSave() {
     if (bucket.length === 0) return;
 
     showLoading("Generating Professional Reports...");
@@ -288,7 +288,7 @@ async function downloadAndSave() {
         hideLoading();
         alert("Nahi ho raha... Reference ya Library ka error hai.");
     }
-}
+}*/
 
 
 
@@ -505,8 +505,6 @@ function hideBucketScreen() { document.getElementById('bucketView').style.displa
 function showHistoryScreen() { document.getElementById('adminView').style.display='none'; document.getElementById('historyView').style.display='flex'; showHistoryList(); }
 function hideHistoryScreen() { document.getElementById('historyView').style.display='none'; document.getElementById('adminView').style.display='block'; }
 
-
-
 function showHistoryList() {
     const area = document.getElementById('historyList');
     
@@ -592,117 +590,157 @@ function showHistoryList() {
 
 function showBucketScreen() {
     document.getElementById('adminView').style.display = 'none';
-    document.getElementById('bucketView').style.display = 'flex';
+    document.getElementById('bucketView').style.display = 'block';
     
     const area = document.getElementById('bucketItemsList'); 
     const confirmBtn = document.querySelector('.btn-main-action');
     
-if (bucket.length === 0) {
-        // --- MAJEDAR EMPTY BUCKET STATE ---
-        area.innerHTML = `
-            <div style="
-                text-align: center; 
-                padding: 40px 20px; 
-                background: #fdfdfd; 
-                border-radius: 20px; 
-                margin-top: 20px;
-                border: 2px dashed #2e7d32;
-            ">
-                <div style="font-size: 50px; margin-bottom: 10px;">🛒</div>
-                <h3 style="color: #1e293b; margin-bottom: 8px;">Bucket is Empty!</h3>
-                <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">
-                    Aapka bucket abhi khali hai. Kuch mazedaar items select karke yahan layein!
-                </p>
-                
-                <button onclick="hideBucketScreen()" style="
-                    background: #2e7d32; 
-                    color: white; 
-                    border: none; 
-                    padding: 12px 25px; 
-                    border-radius: 50px; 
-                    font-weight: bold; 
-                    font-size: 14px; 
-                    cursor: pointer;
-                    box-shadow: 0 4px 15px rgba(46, 125, 50, 0.2);
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
-                    transition: 0.2s;
-                " onmouseover="this.style.backgroundColor='#1b5e20'" onmouseout="this.style.backgroundColor='#2e7d32'">
-                    🚀 Start Adding Items
-                </button>
+    if (bucket.length === 0) {
+        area.innerHTML = `<div style="text-align:center; padding:40px; border:2px dashed #2e7d32; border-radius:20px;">
+                <div style="font-size:50px;">🛒</div>
+                <h3>Bucket is Empty!</h3>
+                <button onclick="hideBucketScreen()" style="background:#2e7d32; color:white; border:none; padding:10px 20px; border-radius:50px; margin-top:15px;">🚀 Start Adding</button>
             </div>`;
-            
         if(confirmBtn) confirmBtn.style.display = 'none';
         return;
     }
+
     if(confirmBtn) confirmBtn.style.display = 'block';
     area.innerHTML = '';
 
     const grouped = groupBucketItems();
-    const catNames = Object.keys(grouped);
 
-    catNames.forEach(catName => {
+    for (const [category, items] of Object.entries(grouped)) {
         const groupDiv = document.createElement('div');
         groupDiv.className = 'bucket-group-card';
-        
-        // Space hatakar clean ID banana
-        const safeId = catName.split(' ').join('');
-        groupDiv.id = 'capture-section-' + safeId;
-        
-     /*   let itemsHtml = '';
-        grouped[catName].forEach(it => {
-            itemsHtml += `
-                <div class="order-row" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #eee;">
-                    <div style="flex:1;">
-                        <strong style="display:block;">${it.name}</strong>
-                        <small style="color:#666;">${it.path}</small>
-                    </div>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <input type="number" class="qty-input" id="qty-${it.originalIndex}" value="1" style="width:50px; text-align:center;">
-                        <button onclick="removeFromBucket(${it.originalIndex})" style="color:red; background:none; border:none; font-size:1.2rem;">✕</button>
-                    </div>
-                </div>`;
-        });*/
-
-let itemsHtml = '';
-    grouped[catName].forEach((it, idx) => {
-        itemsHtml += `
-            <div class="order-row">
-                <div style="flex:1;">
-                    <strong>${it.name}</strong>
-                    <small style="display:block;">${it.path}</small>
-                </div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <input type="number" 
-                           class="qty-input" 
-                           id="qty-${it.originalIndex}" 
-                           value="1" 
-                           onkeydown="focusNextInput(event, ${it.originalIndex})"
-                           inputmode="numeric">
-                    <button onclick="removeFromBucket(${it.originalIndex})" style="color:red; background:none; border:none; font-size:1.1rem;">✕</button>
-                </div>
-            </div>`;
-    });
-
-
-        groupDiv.innerHTML = `
-            <div class="group-header" style="background:#f1f5f9; padding:10px; font-weight:bold; color:var(--primary);">
-                📦 ${catName}
-            </div>
-            <div class="group-body" style="background:white;">
-                ${itemsHtml}
-            </div>
-        `;
-        
         groupDiv.style.marginBottom = "20px";
         groupDiv.style.border = "1px solid #e2e8f0";
-        groupDiv.style.borderRadius = "10px";
+        groupDiv.style.borderRadius = "12px";
         groupDiv.style.overflow = "hidden";
         
+        groupDiv.innerHTML = `
+            <div style="background:#f1f5f9; padding:12px 15px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:bold; color:#1e293b;">📦 ${category}</span>
+                <button onclick="downloadSingleCategory('${category}')" style="background:#2e7d32; color:white; border:none; padding:5px 12px; border-radius:6px; font-size:12px; cursor:pointer;">
+                    📥 Download
+                </button>
+            </div>
+            <div style="background:white; padding:10px;">
+                ${items.map(it => `
+                    <div class="order-row" style="display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee;">
+                        <div style="flex:1;">
+                            <strong style="display:block; font-size:14px;">${it.name}</strong>
+                            <small style="color:#64748b; font-size:11px;">${it.path}</small>
+                        </div>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <input type="number" id="qty-${it.originalIndex}" value="${it.qty || 1}" style="width:70px; height:35px; text-align:center; border:1px solid #ccc; border-radius:7px;">
+                            <button onclick="removeFromBucket(${it.originalIndex})" style="color:red; background:none; border:none; font-size:2.5rem;margin:1.5px;">&times;</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
         area.appendChild(groupDiv);
-    });
+    }
 }
+async function downloadSingleCategory(categoryName) {
+    showLoading(`Generating ${categoryName} Report...`);
+
+    // 1. Quantities Sync (Taki input ki gayi value download ho)
+    bucket.forEach((item, idx) => {
+        const qtyInput = document.getElementById(`qty-${idx}`);
+        if (qtyInput) item.qty = qtyInput.value || 1;
+    });
+
+    // 2. Filter items: Sirf wahi items jo is category ke hain
+    // Variable ka naam 'itemsToDownload' (small i) hai
+    const itemsToDownload = bucket.filter(item => {
+        const parts = item.path.split(' > ');
+        return (parts[1] || "General") === categoryName;
+    });
+
+    const captureContainer = document.getElementById('image-capture-container');
+    captureContainer.style.visibility = 'visible';
+    captureContainer.style.left = '0';
+    captureContainer.style.top = '0';
+
+    try {
+        captureContainer.innerHTML = `
+            <div id="capture-box" style="width: 400px; background: #ffffff; padding: 15px; font-family: ui-monospace, monospace; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <div style="border-bottom: 3px solid #2e7d32; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div>
+                        <h2 style="margin: 0; color: #212121; font-size: 20px; text-transform: uppercase;">${categoryName}</h2>
+                        <span style="font-size: 11px; color: #757575;">Report • ${new Date().toLocaleDateString('en-GB')}</span>
+                    </div>
+                    <div style="font-size: 12px; font-weight: bold; color: #616161;">Total: ${itemsToDownload.length} Items</div>
+                </div>
+
+                <div style="display: flex; background: #455a64; color: white; padding: 7px 10px; font-size: 11px; font-weight: bold; border-radius: 4px 4px 0 0;">
+                    <div style="width: 30px; color:white;">SR.</div>
+                    <div style="flex: 3; color:white; padding-left:5px;">ITEM DESCRIPTION</div>
+                    <div style="flex: 1; text-align: right; color:white;">QTY</div>
+                </div>
+
+                <div style="border: 1px solid #cfd8dc; border-top: none;">
+                    ${itemsToDownload.map((it, idx) => {
+                        // Yahan spelling 'itemsToDownload' honi chahiye
+                        return `
+                            <div style="display: flex; align-items: center; padding: 8px 10px; border-bottom: 1px solid #eceff1; background: ${idx % 2 === 0 ? '#ffffff' : '#fafafa'};">
+                                <div style="width: 30px; font-size: 11px; color: #9e9e9e; font-weight:bold;">${idx + 1}.</div>
+                                <div style="flex: 3; padding-left: 5px;">
+                                    <div style="font-weight: 700; font-size: 14px; color: #212121;">${it.name}</div>
+                                </div>
+                                <div style="flex: 1; text-align: right; font-weight: 900; font-size: 17px; color: #2e7d32;">${it.qty}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div style="margin-top: 10px; padding-top: 8px; font-size: 9px; color: #bdbdbd; display: flex; justify-content: space-between;">
+                    <span>Stock-Master Ultra</span>
+                    <span>${new Date().toLocaleTimeString()}</span>
+                </div>
+            </div>`;
+
+        await new Promise(res => setTimeout(res, 1000));
+
+        // html2canvas ka upyog capture ke liye
+        const canvas = await html2canvas(document.getElementById('capture-box'), { scale: 2 });
+        const dataUrl = canvas.toDataURL("image/png");
+        
+        const link = document.createElement('a');
+        link.download = `${categoryName}_Order.png`;
+        link.href = dataUrl;
+        link.click();
+
+        // --- BUCKET CLEANUP & HISTORY ---
+        history.push({
+            date: new Date().toISOString(),
+            items: JSON.parse(JSON.stringify(itemsToDownload))
+        });
+
+        // Bucket se downloaded items remove karein
+        bucket = bucket.filter(item => {
+            const parts = item.path.split(' > ');
+            return (parts[1] || "General") !== categoryName;
+        });
+
+        await saveData(); // Cloud Update
+        
+        captureContainer.style.visibility = 'hidden';
+        captureContainer.style.left = '-2000px';
+        hideLoading();
+        
+        showBucketScreen(); // Bucket refresh
+        render(); // Main screen refresh (Green ticks hatane ke liye)
+
+    } catch (error) {
+        console.error("Capture failed:", error);
+        hideLoading();
+        alert("Download failed. Library check karein.");
+    }
+}
+
+
 function groupBucketItems() {
     const grouped = {};
     bucket.forEach((item, index) => {
