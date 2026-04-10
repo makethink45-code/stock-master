@@ -22,8 +22,16 @@
 
 <script>
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+
+// Sirf itna rakho, ekdum saaf!
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Iske niche koi bhi db.settings ya db.enablePersistence mat rakhna.
+
+
+
+
   
   // SPCK Connection Fix:
 // SPCK Connection Fix:
@@ -104,7 +112,7 @@
                 <button class="btn-close-view" onclick="hideBucketScreen()">✕</button>
             </div>
             <div id="bucketItemsList" class="order-list"></div>
-        </div>
+        </div> 
 
         <div id="historyView" class="view" style="display: none;">
             <div class="view-header">
