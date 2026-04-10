@@ -78,15 +78,16 @@ body {
     flex-direction: column; 
     position: relative;
     overflow: hidden;
-    padding: 18px;
+    padding: 12px;
 }
 .list-container, 
 .order-list, 
 .history-list { 
     flex: 1;            /* Ye area bachi hui poori jagah le lega */
     overflow-y: auto;   /* Sirf yahi area scroll hoga */
-    padding-bottom: 80px; /* Selection bar ke liye niche jagah chhodein */
+    padding-bottom: 30px; /* Selection bar ke liye niche jagah chhodein */
     -webkit-overflow-scrolling: touch; /* Mobile par smooth scroll ke liye */
+    
 }
 /* --- 2. Top Bar & Branding --- */
 .top-bar { 
@@ -114,7 +115,10 @@ h2 span { font-size: 1.4rem; } /* For 📦 icon */
     transition: all 0.2s ease;
 }
 .btn-icon-top:hover { background: #cbd5e1; }
-.btn-icon-top:active { transform: scale(0.95); }
+.btn-icon-top:active { transform: scale(0.9);
+    opacity: 0.7;
+    transition: 0.1s;
+    }
 
 .bucket-nav { 
     background: var(--primary); 
@@ -146,7 +150,7 @@ h2 span { font-size: 1.4rem; } /* For 📦 icon */
     background: white; 
     box-shadow: 0 10px 30px rgba(0,0,0,0.12); 
     border-radius: 16px; 
-    z-index: 5000; 
+    z-index: 2000; 
     min-width: 190px; 
     overflow: hidden;
     border: 1px solid var(--border-base);
@@ -198,7 +202,7 @@ h2 span { font-size: 1.4rem; } /* For 📦 icon */
 .list-container { 
     flex: 1; 
     overflow-y: auto; 
-    margin-bottom: 75px; /* Space for floating bar */
+    margin-bottom: 60px; /* Space for floating bar */
 }
 
 .item-card { 
@@ -218,8 +222,8 @@ h2 span { font-size: 1.4rem; } /* For 📦 icon */
 }
 .item-card:hover { border-color: #cbd5e1; }
 .item-card.multi-selected { 
-    background: #eff6ff; 
-    border: 2px solid #3b82f6; 
+    border: 2px solid var(--primary) !important;
+    background-color: #f0f7ff !important;
 }
 
 .item-name { display: flex; align-items: center; gap: 12px;
@@ -251,7 +255,7 @@ h2 span { font-size: 1.4rem; } /* For 📦 icon */
     left: 10px; 
     right: 10px; 
     background: #1e293b; 
-    z-index: 1000;
+    z-index: 500;
     color: white; 
     padding: 8px 12px; 
     border-radius: 20px; 
@@ -280,7 +284,10 @@ h2 span { font-size: 1.4rem; } /* For 📦 icon */
     display: flex; flex-direction: column; align-items: center; gap: 4px;
     cursor: pointer; transition: 0.2s; min-width: 50px;
 }
-.action-item:active { transform: scale(0.9); }
+.action-item:active { transform: scale(0.9);
+    opacity: 0.7;
+    transition: 0.1s;
+    }
 .action-item span { font-size: 1.2rem; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5)); }
 .action-item label { 
     font-size: 0.6rem; color: #cbd5e1; font-weight: 600; 
@@ -297,7 +304,7 @@ h2 span { font-size: 1.4rem; } /* For 📦 icon */
 .modal { 
     position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
     background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px);
-    display: flex; justify-content: center; align-items: center; z-index: 9999; 
+    display: flex; justify-content: center; align-items: center; z-index: 10000; 
 }
 .modal-content { background: white; padding: 20px; border-radius: 20px; width: 90%; max-width: 400px; box-shadow: 0 15px 50px rgba(0,0,0,0.15);}
 .modal-content h3 { font-size: 1.2rem; font-weight: 800; color: var(--dark); margin-bottom: 20px; }
@@ -485,7 +492,7 @@ order-row {
     font-size: 0.85rem;
 }
 
-#masterInput {
+/*old #masterInput {
     border: 2px solid var(--border-base);
     border-radius: 12px;
     min-height: 100px;
@@ -493,19 +500,39 @@ order-row {
     font-size: 1rem;
     width: 100%;
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
-}
-.breadcrumb {
-    padding: 8px 12px; 
-    margin-bottom: 12px;
-    font-size: 0.8rem;
-    background: var(--bg-main);
+}*/
+#masterInput {
+    border: 2px solid var(--border-base);
     border-radius: 12px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    overflow-x: auto;
+    min-height: 120px;
+    padding: 15px;
+    font-size: 16px; /* Mobile par auto-zoom rokne ke liye 16px best hai */
+    width: 100%;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    resize: none;
+    background: #fafafa;
 }
 
+/* Modal ko mobile keyboard ke waqt thoda upar shift karne ke liye */
+@media (max-height: 500px) {
+    .modal-content {
+        transform: translateY(-20px);
+    }
+}
+
+
+
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 15px;
+    background: #ffffff;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 5px;
+    overflow-x: auto;
+    font-family: monospace; /* Professional look */
+}
 .crumb-link {
     color: var(--primary);
     font-weight: 700;
@@ -530,15 +557,20 @@ order-row {
 .bucket-group-card {
     background: #ffffff;
     border: 1px solid var(--border-base);
-    margin-bottom: 15px !important;
-    border-radius: 12px !important;
-    padding: 0; /* Clear padding for capture safety */
-    box-shadow: 0 4px 12px rgba(0,0,0,0.02); /* Sober shadow */
+    margin: 1px;
+    border-radius: 12px;
     overflow: hidden;
-    
-    /* Image consistency fix: Ensures uniformity in width and some height */
-    min-width: 320px; 
-    transition: var(--transition);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.order-row:last-child {
+    border-bottom: none !important;
+}
+
+.qty-input:focus {
+    border-color: var(--primary) !important;
+    outline: none;
+    background: #f0f7ff;
 }
 
 .bucket-group-card .group-header {
@@ -564,7 +596,7 @@ order-row {
 
 
 .bucket-group-card .group-body {
-    padding: 10px 20px 20px 20px;
+    padding: 10px 0px 20px 0px;
 }
 
 /* Image quality improvements for capture */
@@ -747,3 +779,13 @@ order-row {
     margin-bottom: 15px !important;
     border-radius: 12px !important;
 }
+
+/* Toggle Switch Styling */
+.switch { position: relative; display: inline-block; width: 34px; height: 18px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+.slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .slider { background-color: var(--success); }
+input:checked + .slider:before { transform: translateX(16px); }
+.toggle-container { text-align: center; margin-right: 5px; }
+                                                                        
