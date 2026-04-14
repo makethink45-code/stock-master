@@ -203,6 +203,7 @@ h2 span { font-size: 1.4rem; } /* For 📦 icon */
     flex: 1; 
     overflow-y: auto; 
     margin-bottom: 60px; /* Space for floating bar */
+    height: 100%;
 }
 
 .item-card { 
@@ -448,16 +449,16 @@ order-row {
     background: var(--primary-light);
     color: var(--primary);
     border: none;
-    width: 28px;
-    height: 28px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     font-weight: bold;
-    margin-right: 10px;
+    margin: 1px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
+    font-size: 1.4rem;
 }
 
 /* Fix for Bucket View Buttons */
@@ -774,7 +775,6 @@ order-row {
     font-size: 0.9rem;
     height: 35px;
 }
-
 .bucket-group-card {
     margin-bottom: 15px !important;
     border-radius: 12px !important;
@@ -788,4 +788,172 @@ order-row {
 input:checked + .slider { background-color: var(--success); }
 input:checked + .slider:before { transform: translateX(16px); }
 .toggle-container { text-align: center; margin-right: 5px; }
-                                                                        
+/* Button ke andar loader ka style */
+.btn-loading {
+    position: relative;
+    color: transparent !important;
+    pointer-events: none;
+}
+
+.btn-loading::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin: -8px 0 0 -8px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.8s linear infinite;
+}
+
+/* WhatsApp Button Style */
+.btn-whatsapp {
+    background: #25D366 !important;
+    color: white !important;
+    border: none;
+    padding: 12px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: bold;
+}
+/* --- Non-Blocking UI & Loaders --- */
+
+/* 1. Category Card Processing Overlay */
+.category-processing {
+    position: relative;
+    pointer-events: none; /* Card par click band ho jayega */
+    transition: all 0.3s ease;
+}
+
+.category-processing::before {
+    content: "⚙️ Generating Report...";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255, 255, 255, 0.85); /* White blur background */
+    backdrop-filter: blur(3px); /* Glass effect */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 800;
+    color: var(--primary);
+    z-index: 100;
+    border-radius: 12px;
+    font-size: 14px;
+}
+
+/* 2. Button Spinner (PNG/Share buttons ke liye) */
+.btn-loading {
+    position: relative;
+    color: transparent !important; /* Text chhupane ke liye */
+    pointer-events: none;
+}
+
+.btn-loading::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin: -8px 0 0 -8px; /* Center align */
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white; /* Spinner ka color */
+    animation: spin-loader 0.8s linear infinite;
+}
+
+/* Spinner Animation */
+@keyframes spin-loader {
+    to { transform: rotate(360deg); }
+}
+
+/* WhatsApp Button Colors (Professional Share) */
+/*old .btn-whatsapp-image {
+    background: #075E54 !important; 
+    color: white !important;
+}
+
+.btn-whatsapp-text {
+    background: #25D366 !important;
+    color: white !important;
+}*/
+
+/* Bucket Buttons ko professional banane ke liye */
+.group-header div {
+    display: flex;
+    gap: 6px;
+}
+
+.group-header button {
+    padding: 5px 10px !important;
+    font-size: 11px !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    text-transform: none !important;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+/* Share Image Button */
+.btn-whatsapp-img {
+    background: #075E54 !important;
+    color: white !important;
+}
+
+/* PNG Button */
+.btn-png-dl {
+    background: var(--success) !important;
+    color: white !important;
+}
+/* Bucket Header ke Icon Buttons (Sober Look) */
+.group-header div.button-group {
+    display: flex;
+    gap: 4px; /* Buttons ekdum paas-paas honge */
+    align-items: center;
+    justify-content: flex-end; /* Right side stick honge */
+}
+
+.group-header .btn-icon {
+    width: 30px; /* Chhote aur square */
+    height: 30px;
+    padding: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px !important;
+    border: none !important;
+    font-size: 15px !important;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s, transform 0.1s;
+    background: transparent !important; /* No background color */
+    color: var(--text-sec) !important; /* Simple Gray Icon */
+}
+
+/* Hover/Active effects */
+.group-header .btn-icon:hover {
+    background-color: #f1f5f9 !important; /* Subtle gray highlight */
+    color: var(--primary) !important; /* Icon turns primary color */
+}
+
+.group-header .btn-icon:active {
+    transform: scale(0.92);
+    background-color: #e2e8f0 !important;
+}
+
+/* Specific hover color WhatsApp ke liye */
+.group-header .btn-icon-wa:hover {
+    color: #25D366 !important;
+}
+
+/* Loader support iconic buttons ke liye */
+.btn-loading::after {
+    border-top-color: var(--primary); /* Spinner primary color mein */
+        }
+    
