@@ -253,7 +253,7 @@ function handleSearch() {
 
         div.innerHTML = `
             <div style="flex:1">
-                <small style="color:var(--text-sec); font-size:0.75rem">${res.pathString}</small><br>
+                <small style="color:var(--text-sec); font-size:0.80rem">${res.pathString}</small><br>
                 <div class="item-name">
                     <span>${res.node.type === 'category' ? '📁' : '🔹'} ${res.node.name}</span>
                 </div>
@@ -450,7 +450,20 @@ function removeFromBucket(idx) {
 }
 function hideBucketScreen() { document.getElementById('bucketView').style.display='none'; document.getElementById('adminView').style.display='flex'; render(); }
 function showHistoryScreen() { document.getElementById('adminView').style.display='none'; document.getElementById('historyView').style.display='flex'; showHistoryList(); }
-function hideHistoryScreen() { document.getElementById('historyView').style.display='none'; document.getElementById('adminView').style.display='block'; }
+function hideHistoryScreen() {
+    document.getElementById('historyView').style.display = 'none';
+    const adminView = document.getElementById('adminView');
+    adminView.style.display = 'block';
+    
+    // Scroll Fix: Forcefully ensure list-container is scrollable
+    const displayArea = document.getElementById('displayArea');
+    if (displayArea) {
+        displayArea.style.overflowY = 'auto';
+        displayArea.scrollTop = 0; // Wapas top par le aao
+    }
+    
+    render(); // UI ko refresh karein taaki elements wapas load ho jayein
+}
 
 
 function showHistoryList() {
@@ -508,20 +521,22 @@ function showHistoryList() {
     });
 }
 
-
-
-
 async function downloadSingleCategory(categoryName) {
-    showLoading(`Generating ${categoryName} Report...`);
-
-    // 1. Quantities Sync (Taki input ki gayi value download ho)
-    bucket.forEach((item, idx) => {
-        const qtyInput = document.getElementById(`qty-${idx}`);
-        if (qtyInput) item.qty = qtyInput.value || 1;
+    const btn = document.getElementById(`dl-btn-${categoryName}`);
+    
+    // 1. Us category ka card dhundho loader ke liye
+    const allGroups = document.querySelectorAll('.bucket-group-card');
+    let targetCard = null;
+    allGroups.forEach(card => {
+        if(card.innerText.includes(categoryName)) targetCard = card;
     });
 
-    // 2. Filter items: Sirf wahi items jo is category ke hain
-    // Variable ka naam 'itemsToDownload' (small i) hai
+    // Button par shimmer aur card par processing class
+    if (btn) btn.classList.add('btn-loading');
+    if (targetCard) targetCard.classList.add('category-processing');
+
+    // Quantities Sync
+syncAllQuantities(); 
     const itemsToDownload = bucket.filter(item => {
         const parts = item.path.split(' > ');
         return (parts[1] || "General") === categoryName;
@@ -533,6 +548,7 @@ async function downloadSingleCategory(categoryName) {
     captureContainer.style.top = '0';
 
     try {
+        // --- AAPKA DESIGN CODE START ---
         captureContainer.innerHTML = `
             <div id="capture-box" style="width: 400px; background: #ffffff; padding: 15px; font-family: ui-monospace, monospace; border: 1px solid #e0e0e0; border-radius: 8px;">
                 <div style="border-bottom: 3px solid #2e7d32; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end;">
@@ -542,73 +558,51 @@ async function downloadSingleCategory(categoryName) {
                     </div>
                     <div style="font-size: 12px; font-weight: bold; color: #616161;">Total: ${itemsToDownload.length} Items</div>
                 </div>
-
                 <div style="display: flex; background: #455a64; color: white; padding: 7px 10px; font-size: 11px; font-weight: bold; border-radius: 4px 4px 0 0;">
                     <div style="width: 30px; color:white;">SR.</div>
                     <div style="flex: 3; color:white; padding-left:5px;">ITEM DESCRIPTION</div>
                     <div style="flex: 1; text-align: right; color:white;">QTY</div>
                 </div>
-
                 <div style="border: 1px solid #cfd8dc; border-top: none;">
-                  
-${itemsToDownload.map((it, idx) => {
-    let pathParts = it.path.split(' > '); // ["Home", "Packets", "Lays", "Wafer"]
-    let activePathSegments = [];
-    
-    // Inventory tree ki shuruat 'Home' se karenge
-    let currentCheck = inventory;
-    
-    pathParts.forEach((part, pIdx) => {
-        if (part === "Home") return; // Home ko hamesha skip karna hai
-
-        // Tree mein folder dhoondna
-        let folder = currentCheck.children ? currentCheck.children.find(c => c.name === part) : null;
-        
-        if (folder) {
-            // SHART: 
-            // 1. Ye sabse pehli category nahi honi chahiye (pIdx === 1 yani 'Packets')
-            // 2. Iska toggle ON (true) hona chahiye
-            if (pIdx > 1 && folder.showInReport === true) {
-                activePathSegments.push(part);
-            }
-            currentCheck = folder; // Agle gehre level par jao
-        }
-    });
-
-    // Aapki misaal ke hisaab se: 
-    // Agar Lays(ON) + Wafer(OFF) + Masala -> "Lays Masala"
-    // Agar Lays(ON) + Wafer(ON) + Masala -> "Lays Wafer Masala"
-    // Agar dono OFF -> "Masala"
-    let displayName = activePathSegments.length > 0 
-        ? activePathSegments.join(' ') + ' ' + it.name 
-        : it.name;
-
-    return `
-        <div style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eceff1;">
-            <div style="width: 30px; font-size: 11px; color: #9e9e9e; font-weight:bold;">${idx + 1}.</div>
-            <div style="flex: 3; padding-left: 5px;">
-                <div style="font-weight: 700; font-size: 14px; color: #212121; line-height: 1.2;">
-                    ${capitalizeFirstLetter(displayName)}
-                </div>
-            </div>
-            <div style="flex: 1; text-align: right; font-weight: 900; font-size: 17px; color: #2e7d32;">
-                ${it.qty}
-            </div>
-        </div>`;
-}).join('')}
-
+                    ${itemsToDownload.map((it, idx) => {
+                        let pathParts = it.path.split(' > ');
+                        let activePathSegments = [];
+                        let currentCheck = inventory;
+                        pathParts.forEach((part, pIdx) => {
+                            if (part === "Home") return;
+                            let folder = currentCheck.children ? currentCheck.children.find(c => c.name === part) : null;
+                            if (folder) {
+                                if (pIdx > 1 && folder.showInReport === true) activePathSegments.push(part);
+                                currentCheck = folder;
+                            }
+                        });
+                        let displayName = activePathSegments.length > 0 ? activePathSegments.join(' ') + ' ' + it.name : it.name;
+                        return `
+                            <div style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eceff1;">
+                                <div style="width: 30px; font-size: 11px; color: #9e9e9e; font-weight:bold;">${idx + 1}.</div>
+                                <div style="flex: 3; padding-left: 5px;">
+                                    <div style="font-weight: 700; font-size: 14px; color: #212121; line-height: 1.2;">
+                                        ${capitalizeFirstLetter(displayName)}
+                                    </div>
+                                </div>
+                                <div style="flex: 1; text-align: right; font-weight: 900; font-size: 17px; color: #2e7d32;">
+                                    ${it.qty}
+                                </div>
+                            </div>`;
+                    }).join('')}
                 </div>
                 <div style="margin-top: 10px; padding-top: 8px; font-size: 9px; color: #bdbdbd; display: flex; justify-content: space-between;">
                     <span>Stock-Master Ultra</span>
                     <span>${new Date().toLocaleTimeString()}</span>
                 </div>
             </div>`;
+        // --- AAPKA DESIGN CODE END ---
 
         await new Promise(res => setTimeout(res, 1000));
 
         const captureBox = document.getElementById('capture-box');
         const canvas = await html2canvas(captureBox, {
-            scale: 3, // Zyada clarity ke liye
+            scale: 3,
             useCORS: true,
             backgroundColor: '#ffffff',
             logging: false
@@ -620,42 +614,44 @@ ${itemsToDownload.map((it, idx) => {
         link.href = dataUrl;
         link.click();
 
+        // Data Cleanup
+        const orderEntry = { date: new Date().toISOString(), items: JSON.parse(JSON.stringify(itemsToDownload)) };
+        history.push(orderEntry);
+        bucket = bucket.filter(item => (item.path.split(' > ')[1] || "General") !== categoryName);
 
-        // --- BUCKET CLEANUP & HISTORY ---
-        // Cleanup aur Cloud Sync
-const orderEntry = { 
-    date: new Date().toISOString(), 
-    items: JSON.parse(JSON.stringify(itemsToDownload)) 
-};
+        await saveBucket(); 
+        await historyRef.set({ orders: history });
 
-history.push(orderEntry);
-
-// Bucket se downloaded category hatao
-bucket = bucket.filter(item => {
-    const parts = item.path.split(' > ');
-    return (parts[1] || "General") !== categoryName;
-});
-
-// Naye optimized functions call karein
-await saveBucket(); 
-await historyRef.set({ orders: history }); // History cloud par save karein
-
-captureContainer.style.visibility = 'hidden';
-hideLoading();
-// Download success hone par koi alert ki zarurat nahi, direct screen refresh
-showBucketScreen();
-render();
-
+        captureContainer.style.visibility = 'hidden';
+        if (targetCard) targetCard.classList.remove('category-processing');
+        if (btn) btn.classList.remove('btn-loading');
         
-       // captureContainer.style.left = '-2000px';
-        
+        // Function ke end mein jahan Cleanup hai:
+bucket = bucket.filter(item => (item.path.split(' > ')[1] || "General") !== categoryName);
+await saveBucket();
+
+// Yahan focus bachane ka logic:
+if (bucket.length === 0) {
+    showBucketScreen(); // Agar bucket khali hai toh empty state dikhao
+} else {
+    // Agar bucket mein abhi bhi items hain, toh sirf loader hatao
+    if (targetCard) targetCard.remove(); // Us category card ko list se hata do bina poora page refresh kiye
+    if (btn) btn.classList.remove('btn-loading');
+    document.getElementById('bucketBadge').innerText = bucket.length;
+}
+
+        render();
 
     } catch (error) {
-        console.error("Capture failed:", error);
-        hideLoading();
-        alert("Download failed. Library check karein.");
+        console.error(error);
+        if (targetCard) targetCard.classList.remove('category-processing');
+        if (btn) btn.classList.remove('btn-loading');
     }
+
+    
 }
+
+
 
 function showBucketScreen() {
     document.getElementById('adminView').style.display = 'none';
@@ -681,12 +677,21 @@ function showBucketScreen() {
         groupDiv.className = 'bucket-group-card';
         
         groupDiv.innerHTML = `
-            <div class="group-header" style="background:#f8fafc; padding:12px 15px; display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #eee;">
-                <span style="font-weight:bold; color:var(--primary);">📦 ${category}</span>
-                <button onclick="downloadSingleCategory('${category}')" style="background:var(--success); color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-weight:bold;">
-                    📥 Download
-                </button>
-            </div>
+
+<div class="group-header" style="background:#f8fafc; padding:10px 15px; display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #eee;">
+    <span style="font-weight:700; color:var(--primary); font-size:13px;">📦 ${category}</span>
+    <div class="button-group"> <button id="dl-btn-${category}" class="btn-icon btn-png-dl" onclick="downloadSingleCategory('${category}')" title="Download PNG">
+            📥
+        </button>
+        <button id="share-img-${category}" class="btn-icon btn-whatsapp-img btn-icon-wa" onclick="shareImageToWhatsApp('${category}')" title="Share Image">
+            🖼️
+        </button>
+        <button class="btn-icon btn-whatsapp-text btn-icon-wa" onclick="shareToWhatsApp('${category}')" title="Share Text">
+            💬
+        </button>
+    </div>
+</div>
+
             <div class="group-body" style="background:white;">
                 ${items.map(it => `
                     <div class="order-row" style="display:flex; justify-content:space-between; align-items:center; padding:12px 15px; border-bottom:1px solid #f1f5f9;">
@@ -695,11 +700,16 @@ function showBucketScreen() {
                             <small style="color:var(--text-sec); font-size:11px;">${it.path}</small>
                         </div>
                         <div style="display:flex; gap:12px; align-items:center;">
-                            <input type="number" class="qty-input" id="qty-${it.originalIndex}" value="${it.qty || 1}" 
-       onchange="updateBucketQty(${it.originalIndex}, this.value)"
+<input type="number" class="qty-input" 
+       data-path="${it.path}" 
+       data-name="${it.name}"
+       id="qty-${it.originalIndex}" 
+       value="${it.qty || 1}" 
+       onchange="updateBucketQtyDirect(this)"
        onkeydown="focusNextInput(event, ${it.originalIndex})"
        onclick="this.select()"
        style="width:55px; height:35px; text-align:center; border:1px solid #cbd5e1; border-radius:8px; font-weight:bold;">
+
                             <button onclick="removeFromBucket(${it.originalIndex})" 
                                     style="color:var(--danger); background:none; border:none; font-size:24px; cursor:pointer; padding:5px;">&times;</button>
                         </div>
@@ -786,20 +796,19 @@ function focusNextInput(event, currentIndex) {
 
 function saveOrderToHistory() {
     if (bucket.length === 0) return;
-    const allQtyInputs = document.querySelectorAll('.qty-input');
     let entry = { 
         date: new Date().toISOString(), // Valid ISO date string
         items: [] 
     };
     
-    bucket.forEach((it, idx) => {
-        const qtyVal = allQtyInputs[idx] ? allQtyInputs[idx].value : 1;
-        entry.items.push({ 
-            name: it.name, 
-            qty: qtyVal 
-        });
-    });
-
+const allQtyInputs = document.querySelectorAll('.qty-input');
+allQtyInputs.forEach(input => {
+    // ID se index nikalein (e.g., "qty-5" se 5)
+    const originalIdx = input.id.split('-')[1];
+    if (bucket[originalIdx]) {
+        bucket[originalIdx].qty = input.value || 1;
+    }
+});
     history.push(entry);
     bucket = []; // Bucket khali
     saveData(); // Cloud Sync
@@ -860,7 +869,7 @@ activeFolder.children.forEach((item, index) => {
     
     const inBucket = isAlreadyInBucket(item.name, getPathString());
     div.onmousedown = div.ontouchstart = () => {
-        pressTimer = setTimeout(() => { selectionMode = true; toggleSelection(index); }, 700);
+        pressTimer = setTimeout(() => { selectionMode = true; toggleSelection(index); }, 1800);
     };
     div.onmouseup = div.ontouchend = () => clearTimeout(pressTimer);
         div.onclick = (e) => {
@@ -942,7 +951,234 @@ async function updateToggleStatus(index, isChecked) {
     await saveInventory(); 
     console.log("Toggle Status Saved:", isChecked);
 }
+// 1. WhatsApp Par Text Report Bhejne ke liye
+
+async function shareImageToWhatsApp(categoryName) {
+    const btn = document.getElementById(`share-img-${categoryName}`);
+    const captureContainer = document.getElementById('image-capture-container');
     
+    // 1. Loader aur UI protection
+    const allGroups = document.querySelectorAll('.bucket-group-card');
+    let targetCard = null;
+    allGroups.forEach(card => { if(card.innerText.includes(categoryName)) targetCard = card; });
+
+    if(targetCard) targetCard.classList.add('category-processing');
+    if(btn) btn.innerText = "⏳...";
+
+    try {
+        // 2. Data Sync aur Filter
+        bucket.forEach((item, idx) => {
+            const qtyInput = document.getElementById(`qty-${idx}`);
+            if (qtyInput) item.qty = qtyInput.value || 1;
+        });
+
+        const itemsToDownload = bucket.filter(item => {
+            const parts = item.path.split(' > ');
+            return (parts[1] || "General") === categoryName;
+        });
+
+        // 3. Dynamic Element Creation (Yeh step missing tha)
+        captureContainer.style.visibility = 'visible';
+        captureContainer.style.left = '0';
+        
+        // Yahan wahi HTML template aayega jo aapne pehle script.js mein dekha tha
+
+
+captureContainer.innerHTML = `
+            <div id="capture-box" style="width: 400px; background: #ffffff; padding: 15px; font-family: ui-monospace, monospace; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <div style="border-bottom: 3px solid #2e7d32; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div>
+                        <h2 style="margin: 0; color: #212121; font-size: 20px; text-transform: uppercase;">${categoryName}</h2>
+                        <span style="font-size: 11px; color: #757575;">Report • ${new Date().toLocaleDateString('en-GB')}</span>
+                    </div>
+                    <div style="font-size: 12px; font-weight: bold; color: #616161;">Total: ${itemsToDownload.length} Items</div>
+                </div>
+                <div style="display: flex; background: #455a64; color: white; padding: 7px 10px; font-size: 11px; font-weight: bold; border-radius: 4px 4px 0 0;">
+                    <div style="width: 30px; color:white;">SR.</div>
+                    <div style="flex: 3; color:white; padding-left:5px;">ITEM DESCRIPTION</div>
+                    <div style="flex: 1; text-align: right; color:white;">QTY</div>
+                </div>
+                <div style="border: 1px solid #cfd8dc; border-top: none;">
+                    ${itemsToDownload.map((it, idx) => {
+                        let pathParts = it.path.split(' > ');
+                        let activePathSegments = [];
+                        let currentCheck = inventory;
+                        pathParts.forEach((part, pIdx) => {
+                            if (part === "Home") return;
+                            let folder = currentCheck.children ? currentCheck.children.find(c => c.name === part) : null;
+                            if (folder) {
+                                if (pIdx > 1 && folder.showInReport === true) activePathSegments.push(part);
+                                currentCheck = folder;
+                            }
+                        });
+                        let displayName = activePathSegments.length > 0 ? activePathSegments.join(' ') + ' ' + it.name : it.name;
+                        return `
+                            <div style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eceff1;">
+                                <div style="width: 30px; font-size: 11px; color: #9e9e9e; font-weight:bold;">${idx + 1}.</div>
+                                <div style="flex: 3; padding-left: 5px;">
+                                    <div style="font-weight: 700; font-size: 14px; color: #212121; line-height: 1.2;">
+                                        ${capitalizeFirstLetter(displayName)}
+                                    </div>
+                                </div>
+                                <div style="flex: 1; text-align: right; font-weight: 900; font-size: 17px; color: #2e7d32;">
+                                    ${it.qty}
+                                </div>
+                            </div>`;
+                    }).join('')}
+                </div>
+                <div style="margin-top: 10px; padding-top: 8px; font-size: 9px; color: #bdbdbd; display: flex; justify-content: space-between;">
+                    <span>Stock-Master Ultra</span>
+                    <span>${new Date().toLocaleTimeString()}</span>
+                </div>
+            </div>`;
+
+        // 4. Wait for Render & Capture
+        await new Promise(res => setTimeout(res, 500)); 
+        const captureBox = document.getElementById('capture-box'); // Ab yeh element mil jayega!
+
+        if (!captureBox) throw new Error("Capture box not found");
+
+        const canvas = await html2canvas(captureBox, { scale: 3, useCORS: true });
+        
+        canvas.toBlob(async (blob) => {
+            if (!blob) return;
+            const file = new File([blob], `${categoryName}_Report.png`, { type: 'image/png' });
+            
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: `Report: ${categoryName}` });
+            } else {
+                alert("Browser share support nahi karta.");
+            }
+
+            // Cleanup
+            captureContainer.style.visibility = 'hidden';
+            captureContainer.style.left = '-2000px';
+            if(targetCard) targetCard.classList.remove('category-processing');
+            if(btn) btn.innerText = "🖼️ Share";
+        }, 'image/png');
+
+    } catch (error) {
+        console.error("Share error:", error);
+        alert("Sharing failed: " + error.message);
+        if(targetCard) targetCard.classList.remove('category-processing');
+        if(btn) btn.innerText = "🖼️ Share";
+    }
+    
+    // navigator.share ke baad cleanup logic:
+bucket = bucket.filter(item => (item.path.split(' > ')[1] || "General") !== categoryName);
+await saveBucket(); // Cloud update
+showBucketScreen(); // Sirf tabhi refresh karega jab zarurat ho
+render(); 
+
+}
 
 
 
+function updateBucketQtyDirect(input) {
+    const path = input.getAttribute('data-path');
+    const name = input.getAttribute('data-name');
+    
+    // Bucket mein woh item dhundho jiska name aur path match ho
+    const item = bucket.find(it => it.name === name && it.path === path);
+    if (item) {
+        item.qty = input.value || 1;
+        saveBucket(); // Cloud update
+    }
+}
+
+function shareToWhatsApp(categoryName) {
+    // 1. Pehle quantities sync karein
+    syncAllQuantities();
+
+    // 2. Variables define karein (Error Fix)
+    const allGroups = document.querySelectorAll('.bucket-group-card');
+    let targetCard = null;
+    allGroups.forEach(card => {
+        if(card.innerText.includes(categoryName)) targetCard = card;
+    });
+
+    // Hum text share mein button loader nahi dikhayenge kyunki ye instant hota hai
+    
+    if (targetCard) targetCard.classList.add('category-processing');
+
+    // 3. Category items filter karein
+    const items = bucket.filter(item => {
+        const parts = item.path.split(' > ');
+        return (parts[1] || "General") === categoryName;
+    });
+
+    if (items.length === 0) {
+        alert("Is category mein koi item nahi hai!");
+        if (targetCard) targetCard.classList.remove('category-processing');
+        return;
+    }
+
+    // 4. WhatsApp Message Build karein
+    let message = `*📦 ${categoryName.toUpperCase()} REPORT*\n`;
+    message += `📅 Date: ${new Date().toLocaleDateString('en-GB')}\n`;
+    message += `--------------------------\n`;
+
+    items.forEach((it, idx) => {
+        const pathParts = it.path.split(' > ');
+        let activeSegments = [];
+        let currentCheck = inventory;
+        
+        pathParts.forEach((part, pIdx) => {
+            if (part === "Home") return;
+            let folder = currentCheck.children ? currentCheck.children.find(c => c.name === part) : null;
+            if (folder) {
+                if (pIdx > 1 && folder.showInReport === true) activeSegments.push(part);
+                currentCheck = folder;
+            }
+        });
+
+        const smartName = activeSegments.length > 0 ? activeSegments.join(' ') + ' ' + it.name : it.name;
+        
+        // Input se value uthao ya bucket se
+        const qtyInput = document.getElementById(`qty-${it.originalIndex}`);
+        const finalQty = qtyInput ? qtyInput.value : (it.qty || 1);
+
+        message += `${idx + 1}. *${capitalizeFirstLetter(smartName)}* → _Qty: ${finalQty}_\n`;
+    });
+
+    message += `--------------------------\n`;
+    message += `_Generated via Stock-Master Ultra_`;
+
+    // 5. WhatsApp Open karein
+    const encodedMsg = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+
+    // 6. Success Cleanup (Bina keyboard disturb kiye)
+    bucket = bucket.filter(item => {
+        const parts = item.path.split(' > ');
+        return (parts[1] || "General") !== categoryName;
+    });
+
+    saveBucket(); 
+
+    if (bucket.length === 0) {
+        showBucketScreen(); 
+    } else {
+        if (targetCard) {
+            targetCard.style.opacity = '0';
+            targetCard.style.transform = 'translateX(20px)';
+            targetCard.style.transition = '0.3s ease';
+            setTimeout(() => {
+                targetCard.remove(); 
+                document.getElementById('bucketBadge').innerText = bucket.length;
+            }, 500); // 500ms kafi hai sober effect ke liye
+        }
+    }
+}
+function syncAllQuantities() {
+    const allInputs = document.querySelectorAll('.qty-input');
+    allInputs.forEach(input => {
+        const path = input.getAttribute('data-path');
+        const name = input.getAttribute('data-name');
+        const item = bucket.find(it => it.name === name && it.path === path);
+        if (item) {
+            item.qty = input.value || 1;
+        }
+    });
+               }
+                      
