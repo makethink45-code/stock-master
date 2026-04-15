@@ -171,7 +171,7 @@ function showLoading(msg = "Processing...") {
 }
 
 // 2. Updated clearHistory (Isme 'Clearing History...' message bheja hai)
-async function clearHistory() {
+/*old async function clearHistory() {
     if (!confirm("Are you sure you want to delete all history?")) return;
 
     showLoading("Clearing History..."); // <-- Dynamic message
@@ -186,7 +186,7 @@ async function clearHistory() {
         console.error(error);
         hideLoading();
     }
-}
+}*/
 
 function hideLoading() {
     document.getElementById('loadingOverlay').style.display = 'none';
@@ -521,6 +521,7 @@ function showHistoryList() {
     });
 }
 
+
 async function downloadSingleCategory(categoryName) {
     const btn = document.getElementById(`dl-btn-${categoryName}`);
     
@@ -613,9 +614,17 @@ syncAllQuantities();
         link.download = `${categoryName}_Report_${new Date().getTime()}.png`;
         link.href = dataUrl;
         link.click();
+        // html2canvas ke .then block ke andar jahan link.click() hota hai:
+
+// Turant baad aapka custom notification
+triggerAppNotification(
+    "Stock-Master Ultra", 
+    `✅ ${categoryName} ki report download ho gayi hai.`
+);
+
 
         // Data Cleanup
-        const orderEntry = { date: new Date().toISOString(), items: JSON.parse(JSON.stringify(itemsToDownload)) };
+        const orderEntry = {date: new Date().toISOString(), items: JSON.parse(JSON.stringify(itemsToDownload)) };
         history.push(orderEntry);
         bucket = bucket.filter(item => (item.path.split(' > ')[1] || "General") !== categoryName);
 
@@ -702,7 +711,7 @@ function showBucketScreen() {
                         <div style="display:flex; gap:12px; align-items:center;">
 <input type="number" class="qty-input" 
        data-path="${it.path}" 
-       data-name="${it.name}"
+       data-name="${getSmartName(it)}"
        id="qty-${it.originalIndex}" 
        value="${it.qty || 1}" 
        onchange="updateBucketQtyDirect(this)"
@@ -1180,5 +1189,230 @@ function syncAllQuantities() {
             item.qty = input.value || 1;
         }
     });
-               }
-                      
+}
+
+/*function triggerAppNotification(title, message) {
+    if (Notification.permission === "granted") {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification(title, {
+                body: message,
+                icon: 'app-icon.png', // Aapka logo
+                badge: 'app-icon.png', // Chhota icon top bar ke liye
+                vibrate: [100, 50, 100],
+                data: { dateOfArrival: Date.now() }
+            });
+        });
+    } else if (Notification.permission !== "denied") {
+        // Agar permission nahi li gayi, toh pehle permission maange
+        Notification.requestPermission();
+    }
+}*/
+
+function triggerAppNotification(title, message) {
+    // 1. Check if the browser supports Notifications
+    if (!("Notification" in window)) {
+        console.warn("This browser does not support notifications.");
+        return;
+    }
+
+    // 2. Check Permission
+    if (window.Notification.permission === "granted") {
+        // PWA/Mobile logic (Service Worker se best chalta hai)
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(title, {
+                    body: message,
+                    icon: 'app-icon.png',
+                    badge: 'app-icon.png',
+                    vibrate: [100, 50, 100]
+                });
+            });
+        } else {
+            // Normal fallback for desktop/browser
+            new window.Notification(title, { body: message, icon: 'app-icon.png' });
+        }
+    } 
+    // 3. Request Permission if not denied
+    else if (window.Notification.permission !== "denied") {
+        window.Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                triggerAppNotification(title, message);
+            }
+        });
+    }
+}
+
+
+
+
+
+async function updateAdminPassword() {
+    const oldPass = document.getElementById('oldPassInput').value.trim();
+    const newPass = document.getElementById('adminPassInput').value.trim();
+    const settingsRef = db.collection("appSettings").doc("security");
+
+    // Rule 1: Password length check (Exactly 10)
+    if (newPass.length !== 10) {
+        alert("Naya password exact 10 characters ka hona chahiye!");
+        return;
+    }
+
+    showLoading("Verifying Password...");
+
+    try {
+        const doc = await settingsRef.get();
+        const currentCloudPass = doc.exists ? doc.data().adminPass : "admin.html"; // Default agar doc na ho
+
+        // Rule 2: Old Password Verification
+        if (oldPass !== currentCloudPass) {
+            hideLoading();
+            alert("Old Password Galat Hai! Redirecting...");
+            window.location.href = 'index.html'; // Security redirect
+            return;
+        }
+
+        // Rule 3: Update if verified
+        await settingsRef.set({ adminPass: newPass }, { merge: true });
+        
+        hideLoading();
+        alert("Password Successfully Updated!");
+        
+        // Inputs clear karke view hide karein
+        document.getElementById('oldPassInput').value = '';
+        document.getElementById('adminPassInput').value = '';
+        hideSettingsScreen();
+
+    } catch (e) {
+        console.error(e);
+        hideLoading();
+        alert("Connection Error!");
+    }
+}
+// Settings Screen ko toggle karne ke liye logic
+/*function showSettingsScreen() {
+    const adminView = document.getElementById('adminView');
+    const settingsView = document.getElementById('settingsView');
+    const dropMenu = document.getElementById('dropMenu');
+
+    if (adminView && settingsView) {
+        adminView.style.display = 'none';
+        settingsView.style.display = 'flex';
+        
+        // Menu ko band kar dein click hone ke baad
+        if (dropMenu) dropMenu.style.display = 'none';
+
+        // Firestore se current password fetch karke input mein dikhana (Optional)
+        db.collection("appSettings").doc("security").get().then(doc => {
+            if (doc.exists) {
+                // Aap chahein toh naye password input ko khali rakh sakte hain security ke liye
+                console.log("Current security settings loaded.");
+            }
+        });
+    }
+}*/
+
+// Settings View dikhane ke liye
+function showSettingsScreen() {
+    document.getElementById('adminView').style.display = 'none';
+    document.getElementById('settingsView').style.display = 'flex';
+    if(typeof toggleMenu === "function") toggleMenu(); 
+    
+    // Purana password fetch karein
+    db.collection("appSettings").doc("security").get().then(doc => {
+        if (doc.exists) {
+            // Agar pehle se hai toh
+        } else {
+            console.log("No password set yet. Default is admin.html");
+        }
+    });
+}
+
+// Password Update logic (Verification ke saath)
+async function updateAdminPassword() {
+    const oldPass = document.getElementById('oldPassInput').value.trim();
+    const newPass = document.getElementById('adminPassInput').value.trim();
+    const settingsRef = db.collection("appSettings").doc("security");
+
+    if (newPass.length !== 10) {
+        alert("Naya password exact 10 characters ka hona chahiye!");
+        return;
+    }
+
+    try {
+        const doc = await settingsRef.get();
+        // AGAR database khali hai, toh "admin.html" ko default password maanein
+        const currentCloudPass = doc.exists ? doc.data().adminPass : "admin.html"; 
+
+        if (oldPass !== currentCloudPass) {
+            alert("Old Password Galat Hai! Redirecting...");
+            window.location.href = 'index.html'; 
+            return;
+        }
+
+        await settingsRef.set({ adminPass: newPass }, { merge: true });
+        alert("Password Successfully Updated to: " + newPass);
+        hideSettingsScreen();
+    } catch (e) {
+        alert("Error updating password: " + e.message);
+    }
+}
+
+
+function hideSettingsScreen() {
+    const adminView = document.getElementById('adminView');
+    const settingsView = document.getElementById('settingsView');
+
+    if (adminView && settingsView) {
+        settingsView.style.display = 'none';
+        adminView.style.display = 'block';
+        
+        // Inputs clear kar dein
+        document.getElementById('oldPassInput').value = '';
+        document.getElementById('adminPassInput').value = '';
+    }
+}
+// Ye function user-script.js mein updated logic hai
+function getSmartName(item) {
+    const pathParts = item.path.split(' > ');
+    let activeSegments = [];
+    let currentCheck = inventory; // Global inventory object
+
+    pathParts.forEach((part, pIdx) => {
+        if (part === "Home") return;
+        
+        // Inventory tree mein us folder ko dhundhein
+        let folder = currentCheck.children ? currentCheck.children.find(c => c.name === part) : null;
+        
+        if (folder) {
+            // Agar Admin ne is folder ka toggle ON rakha hai (pIdx > 1 check taaki Home skip ho)
+            if (pIdx > 1 && folder.showInReport === true) {
+                activeSegments.push(part);
+            }
+            currentCheck = folder;
+        }
+    });
+
+    // Toggle ON wale folders + Item ka naam
+    return activeSegments.length > 0 
+        ? activeSegments.join(' ') + ' ' + item.name 
+        : item.name;
+}
+async function sendGlobalNotification() {
+    const msg = document.getElementById('globalMsgInput').value.trim();
+    if (!msg) return;
+
+    showLoading("Sending...");
+    try {
+        await db.collection("notifications").doc("latest").set({
+            message: msg,
+            timestamp: new Date().getTime(),
+            sender: "Admin"
+        });
+        document.getElementById('globalMsgInput').value = '';
+        hideLoading();
+        alert("Notification sent successfully!");
+    } catch (e) {
+        console.error(e);
+        hideLoading();
+    }
+}

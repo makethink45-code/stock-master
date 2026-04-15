@@ -3,6 +3,7 @@
   "short_name": "StockMaster",
   "start_url": "index.html",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "icons": [

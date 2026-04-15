@@ -325,20 +325,20 @@ h2 span { font-size: 1.4rem; } /* For 📦 icon */
 .view-header h3 { font-size: 1.2rem; font-weight: 800; color: var(--dark); }
 .btn-close-view { background: none; border: none; font-size: 1.2rem; padding: 10px; cursor: pointer;}
 
-/* Bucket & Qty Input */
-order-row { 
+/* Bucket & Qty Input 
+.order-row { 
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
     background: #fff;
-    margin-bottom: 0; /* Cards ke beech ka gap khatam */
+    margin-bottom: 0; 
     padding: 8px 12px !important; 
     border-bottom: 1px solid #f1f5f9 !important;
 }
 .order-row strong { color: var(--dark); font-weight: 700; 
     font-size: 0.9rem;
 }
-.order-row small { font-size: 0.7rem; color: #888; }
+.order-row small { font-size: 0.7rem; color: #888; }*/
 
 .qty-input { width: 60px; padding: 6px; border: 1px solid var(--border-base); border-radius: 6px; text-align: center; font-weight: bold; font-size: 0.9rem; height: 35px;}
 .qty-input:focus { border-color: var(--primary); }
@@ -432,7 +432,7 @@ order-row {
     background: #fff1f2;
     color: #e11d48;
     border: 1px solid #ffe4e6;
-    padding: 8px 16px;
+    padding: 16px 10px;
     border-radius: 10px;
     font-size: 0.8rem;
     font-weight: 600;
@@ -523,7 +523,7 @@ order-row {
 
 
 
-.breadcrumb {
+/*.breadcrumb {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -532,8 +532,8 @@ order-row {
     border-bottom: 1px solid #eee;
     margin-bottom: 5px;
     overflow-x: auto;
-    font-family: monospace; /* Professional look */
-}
+    font-family: monospace; 
+}*/
 .crumb-link {
     color: var(--primary);
     font-weight: 700;
@@ -648,7 +648,7 @@ order-row {
   margin-top: 8px;
   color: #444;
 }
-.clear-btn {
+/*.clear-btn {
   background: red;
   color: white;
   border: none;
@@ -656,7 +656,7 @@ order-row {
   border-radius: 6px;
   margin: 10px;
   cursor: pointer;
-}
+}*/
 
 
 .h-item-container {
@@ -775,6 +775,7 @@ order-row {
     font-size: 0.9rem;
     height: 35px;
 }
+
 .bucket-group-card {
     margin-bottom: 15px !important;
     border-radius: 12px !important;
@@ -955,5 +956,78 @@ input:checked + .slider:before { transform: translateX(16px); }
 /* Loader support iconic buttons ke liye */
 .btn-loading::after {
     border-top-color: var(--primary); /* Spinner primary color mein */
-        }
+}
+
+/* style.css mein update karein */
+html, body {
+    height: -webkit-fill-available; /* Mobile browser height fix */
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Poora page na hile */
+}
+
+#adminView, #historyView {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: -webkit-fill-available;
+}
+
+
+/* Sirf aapki list scroll honi chahiye, poora page nahi */
+.list-container, #displayArea, #historyView {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling for iOS/Android */
+    height: 100%;
+}
+/* style.css mein update karein */
+
+.list-container {
+    flex: 1;
+    overflow-y: auto;
+    /* Niche ki line ke liye extra space */
+    padding-bottom: env(safe-area-inset-bottom, 20px); 
     
+    /* Agar niche buttons hain, toh 80px-100px padding rakhein */
+    padding-bottom: 100px; 
+    
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+}
+@keyframes jiggle {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+.btn-bucket-add.added {
+    background-color: var(--success) !important;
+    color: white;
+}
+
+.item-icon {
+    margin-right: 10px;
+    font-size: 1.2rem;
+}
+/* Voice Search Styles */
+#voiceSearchBtn {
+    transition: transform 0.2s ease, opacity 0.2s;
+    z-index: 10;
+}
+
+#voiceSearchBtn:active {
+    transform: translateY(-50%) scale(0.9);
+    opacity: 0.7;
+}
+
+/* Jab Recording on ho (Red Dot) */
+.recording-active {
+    color: #e11d48;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
