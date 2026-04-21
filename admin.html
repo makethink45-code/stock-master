@@ -94,14 +94,23 @@ const db = firebase.firestore();
                 </div>
             </div>
 
-            <div class="header-row">
-                <div id="breadcrumb" class="breadcrumb"></div>
-            </div>
 
-            <div id="searchWrapper" class="search-box" style="display: none;">
-                <input type="text" id="searchInput" placeholder="Search to add to bucket..." oninput="handleSearch()">
-            </div>
 
+          <div class="header-action-area" style="position: relative; min-height: 45px; display: flex; align-items: center;">
+    
+    <div id="breadcrumb" class="breadcrumb" style="width: 100%; margin: 0;">
+        </div>
+
+    <div id="searchWrapper" class="search-box" style="display: none; width: 100%; margin: 0;" >
+        <div style="position: relative; width: 100%;">
+            <input type="text" id="searchInput" placeholder="Search items..." oninput="handleSearch()" style="width: 100%; padding-right: 45px;">
+            <button id="voiceSearchBtn" onclick="startVoiceSearch()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); border: none; background: transparent;">
+                
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="feather feather-mic"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v1a7 7 0 0 1-14 0v-1"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            </button>
+        </div>
+    </div>
+</div>
 <div id="displayArea" class="list-container">
 
 </div>

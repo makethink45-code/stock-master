@@ -1,6 +1,18 @@
+(function() {
+    // 🧐 Guard check kar raha hai: Kya ticket hai?
+    const isAuthenticated = sessionStorage.getItem('isAdminAuthenticated');
+
+    if (isAuthenticated !== 'true') {
+        // 🚫 Ticket nahi hai! Sidha index par wapas bhej do
+        alert("Unauthorized! Please login first.");
+        window.location.replace('index.html');
+    }
+})();
+let lastBackPressTime = 0;
+let lastPathKey = "";
 let inventory = { name: "Home", type: "category", children: [] };
 let bucket = [];
-let history = [];
+let orderHistory = []
 let currentPath = [inventory];
 let selectedIndices = new Set();
 let selectionMode = false;
@@ -8,7 +20,8 @@ let editTargetIndex = null;
 let pressTimer;
 let addSubTargetNode = null; 
 
-let stockRef, bucketRef, historyRef;
+// ===== UNIVERSAL NAVIGATION SYSTEM =====
+const canUseHistory = typeof window.history.pushState === "function";
 
 function showSkeleton() {
     const area = document.getElementById('displayArea');
@@ -22,69 +35,79 @@ function showSkeleton() {
 
 
 
+
+
 function initRefs() {
     stockRef = db.collection("stock").doc("mainInventory");
     bucketRef = db.collection("stock").doc("currentBucket");
     historyRef = db.collection("stock").doc("orderHistory");
 }
 
+
 // --- CLOUD DATA LOAD (NO LOOP VERSION) ---
 async function loadCloudData() {
     initRefs();
-    const displayArea = document.getElementById('displayArea');
-    
-    // Step 1: Forcefully Skeleton dikhao
-    displayArea.innerHTML = `
-        <div class="loading-wrapper">
-            <div class="skeleton"></div>
-            <div class="skeleton"></div>
-            <div class="skeleton"></div>
-        </div>`;
+    showSkeleton();
 
     try {
-        const [stockDoc, bucketDoc, historyDoc] = await Promise.all([
-            stockRef.get(),
-            bucketRef.get(),
-            historyRef.get()
-        ]);
+        const stockDoc = await stockRef.get();
 
-        if (stockDoc.exists) inventory = stockDoc.data();
-        if (bucketDoc.exists) bucket = bucketDoc.data().items || [];
-        if (historyDoc.exists) history = historyDoc.data().orders || [];
+        if (stockDoc.exists) {
+            const cloudData = stockDoc.data();
+            
+            // Check karein ki data naye format mein hai ya purane
+            if (cloudData.content) {
+                // Naya Format: Data 'content' ke andar hai
+                inventory = cloudData.content;
+                console.log("📦 Loaded New Data Format with Timestamp");
+            } else {
+                // Purana Format: Data direct doc mein hai
+                inventory = cloudData;
+                console.log("📦 Loaded Old Data Format");
+            }
+            
+            currentPath = [inventory];
+            render(); // Admin page render function
+        }
+    } catch (e) {
+        console.error("Load failed:", e);
+        // Error hone par kam se kam khali inventory dikhao taaki page blank na rahe
+        inventory = { name: "Home", type: "category", children: [] };
+        render();
+    }
+}
+window.addEventListener("load", () => {
 
-        currentPath = [inventory];
-        
-        // Step 2: Kam se kam 1.2 second ka delay taaki shimmer animation dikhe
-        setTimeout(() => {
-            render();
-            console.log("✅ Rendered after shimmer");
-        }, 1200);
+    const canUseHistory = typeof window.history.pushState === "function";
 
-    } catch (error) {
-        console.error("Cloud Load Error:", error);
-        const displayArea = document.getElementById('displayArea');
-        displayArea.innerHTML = `
-            <div class="error-state" style="text-align: center; padding: 40px;">
-                <div style="font-size: 50px;">📡</div>
-                <h3 style="color: #e11d48;">Connection Failed</h3>
-                <p style="color: var(--text-sec); font-size: 14px;">Database se connect nahi ho pa rahe hain.</p>
-                <button onclick="location.reload()" style="background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 50px; margin-top: 10px; cursor: pointer;">
-                    🔄 Try Again
-                </button>
-            </div>`;
-        hideLoading();
+    if (canUseHistory) {
+        window.history.pushState({}, "");
+        window.history.pushState({}, "");
+
+        window.addEventListener("popstate", function (e) {
+            e.preventDefault();
+            handleBack();
+            window.history.pushState({}, "");
+        });
+    } else {
+        console.warn("pushState not supported → fallback mode");
     }
 
-}
+});
 
-// App start
 window.addEventListener('DOMContentLoaded', () => {
+    // Purani history clear karke Admin ko base banayein
+    if (window.history && window.history.replaceState) {
+        window.history.replaceState({ type: 'admin-home' }, "");
+    }
     loadCloudData();
 });
 
-// Function to make first letter capital, others small
 
-
+// App load hote hi ek base state set karein
+window.addEventListener('load', () => {
+    history.replaceState({ type: 'home' }, "");
+});
 
 //window.oncontextmenu = function() { return false; }
 
@@ -126,6 +149,8 @@ function handleMasterAdd() {
     render();
     saveData(); // Manual Save after action
 }
+
+
 
 function processBulk(str) {
     const levels = str.split('>').map(s => s.trim());
@@ -190,6 +215,103 @@ function showLoading(msg = "Processing...") {
 
 function hideLoading() {
     document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+
+
+
+// 1. File ke ekdum top par ye variable rakhein
+
+function handleBack() {
+    const settingsView = document.getElementById('settingsView');
+    const adminView = document.getElementById('adminView');
+    const bucketView = document.getElementById('bucketView');
+    const historyView = document.getElementById('historyView');
+    const addModal = document.getElementById('addModal');
+
+    // --- STEP 1: MODALS & OVERLAYS ---
+    if (settingsView && settingsView.style.display === 'flex') {
+        settingsView.style.display = 'none';
+        if (adminView) adminView.style.display = 'block';
+        console.log(lastBackPressTime);
+        lastBackPressTime = 0; // Reset timer
+        render();
+        return;
+    }
+
+    if (addModal && addModal.style.display === 'flex') {
+        hideAddModal();
+        lastBackPressTime = 0;
+        console.log(lastBackPressTime);
+        //Reset timer
+        return;
+    }
+
+    if (AppState.isSearchOpen) {
+        toggleSearch(false);
+        lastBackPressTime = 0; 
+        console.log(lastBackPressTime);
+        // Reset timer
+        return;
+    }
+
+    if (bucketView && bucketView.style.display === 'flex') {
+        hideBucketScreen();
+        lastBackPressTime = 0; 
+        console.log(lastBackPressTime);
+        // Reset timer
+        return;
+    }
+
+    if (historyView && historyView.style.display === 'flex') {
+        hideHistoryScreen();
+        lastBackPressTime = 3000; // Reset timer
+        console.log(lastBackPressTime);
+        return;
+    }
+
+    // --- STEP 2: FOLDER NAVIGATION ---
+if (currentPath.length > 1) {
+    currentPath.pop();
+    render();
+    isExitReady = false; // 🔥 Folder se aate hi exit lock kar do
+    lastBackPressTime = 0;
+    return;
+}
+
+// --- STEP 3: HOME EXIT LOGIC ---
+const currentTime = new Date().getTime();
+
+// Sirf tab exit karo jab Toast dikh chuka ho (isExitReady true ho)
+// AUR gap 2 second se kam ho
+if (isExitReady && (currentTime - lastBackPressTime < 1000)) {
+    window.location.replace('index.html');
+} else {
+    // Home par pehla click ya gap 2s se zyada hone par
+    isExitReady = true; // Agle click ke liye permission do
+    lastBackPressTime = currentTime;
+    showExitToast();
+    
+    // 2 second baad permission wapas le lo (Auto-reset)
+    setTimeout(() => { isExitReady = false; 
+    let toast = document.getElementById('exitToast');
+        toast.style.display = 'none';
+    }
+    , 2000);
+}
+}
+
+
+function showExitToast() {
+    let toast = document.getElementById('exitToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'exitToast';
+        toast.style.cssText = "position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:#333; color:white; padding:10px 20px; border-radius:20px; z-index:9999; font-size:14px;";
+        document.body.appendChild(toast);
+    }
+    toast.innerText = "Press back again to exit Admin Mode";
+    toast.style.display = 'block';
 }
 
 // --- FIX: Search logic for accurate filtering ---
@@ -311,9 +433,15 @@ function getPathString() { return currentPath.map(n => n.name).join(' > '); }
 // Sirf inventory save karne ke liye
 async function saveInventory() {
     try {
-        await stockRef.set(inventory);
-        console.log("☁️ Inventory Updated");
-    } catch (e) { console.error("Save failed", e); }
+        const dataToSave = {
+            content: inventory,
+            lastUpdated: Date.now()
+        };
+        await stockRef.set(dataToSave);
+        console.log("✅ Data saved with new format!");
+    } catch (e) {
+        console.error("Save failed:", e);
+    }
 }
 
 // Sirf Bucket/Cart save karne ke liye
@@ -351,25 +479,119 @@ function capitalizeFirstLetter(str) {
 function clearSelection() { selectedIndices.clear(); selectionMode = false; render(); }
 function toggleMenu() { const m = document.getElementById('dropMenu'); m.style.display = m.style.display==='none'?'block':'none'; }
 function showAddModal() { document.getElementById('addModal').style.display = 'flex'; document.getElementById('dropMenu').style.display = 'none'; }
-function toggleSearch() {
-    const s = document.getElementById('searchWrapper');
+history.pushState({ type: 'modal' }, "");
+/*function toggleSearch() {
+    const searchWrapper = document.getElementById('searchWrapper');
+    const breadcrumb = document.getElementById('breadcrumb');
     const input = document.getElementById('searchInput');
-    
-    if (s.style.display === 'none' || s.style.display === '') {
-        s.style.display = 'block';
+
+    // Agar Search hidden hai, toh dikhao aur breadcrumb chhupao
+    if (searchWrapper.style.display === 'none' || searchWrapper.style.display === '') {
+        breadcrumb.style.display = 'none';
+        searchWrapper.style.display = 'block';
         input.focus();
-    } else {
-        // Aapki requirement: Band hone par text select ho jaye
-        input.select(); 
+    } 
+    // Agar Search khula hai, toh use band karo aur breadcrumb wapas lao
+    else {
+        searchWrapper.style.display = 'none';
+        breadcrumb.style.display = 'block';
+        input.value = '';
         
-        // Thoda delay taaki selection dikhe, phir band ho
-        setTimeout(() => {
-            s.style.display = 'none';
-            input.value = ''; 
-            render(); 
-        }, 150);
+        // Agar admin panel hai toh render(), user page hai toh 
+        render();
+        if (typeof render === "function") render(); 
+        else if (typeof renderUserPage === "function") render();
+    }
+}*/
+
+// ===============================
+// 🔥 GLOBAL STATE
+// ===============================
+const AppState = {
+    navStack: [],
+    folderStack: [],
+    isSearchOpen: false,
+    selectedItems: []
+};
+
+// ===============================
+// 🧠 NAVIGATION MANAGER
+// ===============================
+const Nav = {
+    push(view) {
+        AppState.navStack.push(view);
+    },
+    pop() {
+        return AppState.navStack.pop();
+    },
+    peek() {
+        return AppState.navStack[AppState.navStack.length - 1];
+    },
+    isEmpty() {
+        return AppState.navStack.length === 0;
+    }
+};
+
+// ===============================
+// 🔍 SEARCH SYSTEM
+// ===============================
+/*function toggleSearch(force = null) {
+    const search = document.getElementById('searchWrapper');
+    const breadcrumb = document.getElementById('breadcrumb');
+
+    if (force !== null) {
+        AppState.isSearchOpen = force;
+    } else {
+        AppState.isSearchOpen = !AppState.isSearchOpen;
+    }
+
+    if (AppState.isSearchOpen) {
+        search.style.display = 'block';
+        breadcrumb.style.display = 'none';
+        document.getElementById('searchInput')?.focus();
+        Nav.push('search');
+    } else {
+        search.style.display = 'none';
+        breadcrumb.style.display = 'block';
+
+        if (Nav.peek() === 'search') Nav.pop();
+    }
+}*/
+
+function toggleSearch(show) {
+    const sWrapper = document.getElementById('searchWrapper');
+    const sInput = document.getElementById('searchInput');
+    const breadcrumb = document.getElementById('breadcrumb');
+
+    // Agar show undefined hai (yaani sirf icon click hua hai), toh toggle karein
+    if (show === undefined || show === null) {
+        show = (sWrapper.style.display === 'none' || sWrapper.style.display === '');
+    }
+
+    if (show) {
+        // --- Search Open Karo ---
+        if (sWrapper) sWrapper.style.display = 'block';
+        if (breadcrumb) breadcrumb.style.display = 'none';
+        if (sInput) {
+            sInput.value = '';
+            sInput.focus();
+        }
+        AppState.isSearchOpen = true;
+        if (canUseHistory) history.pushState({ type: 'search' }, "");
+    } else {
+        // --- Search Band Karo ---
+        if (sWrapper) sWrapper.style.display = 'none';
+        if (breadcrumb) breadcrumb.style.display = 'block';
+        if (sInput) sInput.value = '';
+        AppState.isSearchOpen = false;
+        render(); // Original view wapas lane ke liye
     }
 }
+
+
+
+
+
 
 function toggleSelection(i) { selectedIndices.has(i) ? selectedIndices.delete(i) : selectedIndices.add(i); if (selectedIndices.size === 0) selectionMode = false; render(); }
 
@@ -449,7 +671,11 @@ function removeFromBucket(idx) {
     render(); // Badge update karne ke liye
 }
 function hideBucketScreen() { document.getElementById('bucketView').style.display='none'; document.getElementById('adminView').style.display='flex'; render(); }
-function showHistoryScreen() { document.getElementById('adminView').style.display='none'; document.getElementById('historyView').style.display='flex'; showHistoryList(); }
+function showHistoryScreen() { document.getElementById('adminView').style.display='none'; document.getElementById('historyView').style.display='flex'; showHistoryList(); 
+    if (canUseHistory) {
+        history.pushState({ type: 'history' }, "");
+    }
+}
 function hideHistoryScreen() {
     document.getElementById('historyView').style.display = 'none';
     const adminView = document.getElementById('adminView');
@@ -475,7 +701,7 @@ function showHistoryList() {
 
     area.innerHTML = '';
     // Sabse latest order pehle dikhane ke liye reverse()
-    [...history].reverse().forEach((order) => {
+    [...orderHistory].reverse().forEach((order) => {
         const date = new Date(order.date).toLocaleString();
         const card = document.createElement('div');
         card.className = 'history-card';
@@ -625,7 +851,7 @@ triggerAppNotification(
 
         // Data Cleanup
         const orderEntry = {date: new Date().toISOString(), items: JSON.parse(JSON.stringify(itemsToDownload)) };
-        history.push(orderEntry);
+        orderHistory.push(orderEntry);
         bucket = bucket.filter(item => (item.path.split(' > ')[1] || "General") !== categoryName);
 
         await saveBucket(); 
@@ -665,7 +891,7 @@ if (bucket.length === 0) {
 function showBucketScreen() {
     document.getElementById('adminView').style.display = 'none';
     document.getElementById('bucketView').style.display = 'flex';
-    
+    history.pushState({ type: 'bucket' }, "");
     const area = document.getElementById('bucketItemsList'); 
     
     if (bucket.length === 0) {
@@ -773,6 +999,17 @@ function groupBucketItems() {
     return grouped;
 }
 
+function openFolder(idx) {
+    const active = currentPath[currentPath.length - 1];
+    if (active.children[idx].type === 'category') {
+        currentPath.push(active.children[idx]);
+        
+        // ✅ Formula: Folder khulte hi history mein entry dalo
+        history.pushState({ type: 'folder' }, ""); 
+        
+        render();
+    }
+}
 
 
 
@@ -923,12 +1160,13 @@ div.innerHTML = `
     displayArea.appendChild(div);
 });
     }}
+    
     async function clearHistory() {
     if (!confirm("Are you sure you want to delete all history? This will also remove it from the Cloud!")) return;
     showLoading(); 
     try {
-        history = [];
-        await historyRef.set({ orders: [] });
+ orderHistory = [];
+await historyRef.set({ orders: [] });
         showHistoryList(); 
         hideLoading();
     } catch (error) {
@@ -1095,6 +1333,9 @@ function updateBucketQtyDirect(input) {
     }
 }
 
+
+
+
 function shareToWhatsApp(categoryName) {
     // 1. Pehle quantities sync karein
     syncAllQuantities();
@@ -1179,6 +1420,7 @@ function shareToWhatsApp(categoryName) {
         }
     }
 }
+
 function syncAllQuantities() {
     const allInputs = document.querySelectorAll('.qty-input');
     allInputs.forEach(input => {
@@ -1242,6 +1484,28 @@ function triggerAppNotification(title, message) {
     }
 }
 
+// --- SESSION LOGGER (REFRESH-PROOF) ---
+function logEvent(msg) {
+    let logs = JSON.parse(localStorage.getItem('debug_logs') || "[]");
+    logs.push(`${new Date().toLocaleTimeString()}: ${msg}`);
+    // Sirf aakhri 10 logs rakhein
+    if(logs.length > 10) logs.shift();
+    localStorage.setItem('debug_logs', JSON.stringify(logs));
+    console.log(msg);
+}
+
+// Check karein ki pichle session mein kya hua tha
+window.addEventListener('load', () => {
+    let oldLogs = localStorage.getItem('debug_logs');
+    if(oldLogs) {
+        console.warn("📜 PREVIOUS SESSION LOGS:");
+        console.table(JSON.parse(oldLogs));
+        // Dekhne ke baad saaf kar dein (optional)
+        // localStorage.removeItem('debug_logs');
+    }
+});
+
+// Back button trigger track karein
 
 
 
@@ -1313,18 +1577,22 @@ async function updateAdminPassword() {
 
 // Settings View dikhane ke liye
 function showSettingsScreen() {
-    document.getElementById('adminView').style.display = 'none';
-    document.getElementById('settingsView').style.display = 'flex';
-    if(typeof toggleMenu === "function") toggleMenu(); 
+    const adminView = document.getElementById('adminView');
+    const settingsView = document.getElementById('settingsView');
+
+    // 1. Home/Admin page ko poori tarah hide karo
+    if (adminView) adminView.style.display = 'none'; 
     
-    // Purana password fetch karein
-    db.collection("appSettings").doc("security").get().then(doc => {
-        if (doc.exists) {
-            // Agar pehle se hai toh
-        } else {
-            console.log("No password set yet. Default is admin.html");
-        }
-    });
+    // 2. Setting page ko dikhao
+    if (settingsView) settingsView.style.display = 'flex'; 
+
+    // Menu band karein
+    if(typeof toggleMenu === "function") toggleMenu(); 
+
+    // ✅ Formula: Back button ke liye ticket dalo
+    if (canUseHistory) {
+        history.pushState({ type: 'settings' }, "");
+    }
 }
 
 // Password Update logic (Verification ke saath)
@@ -1416,3 +1684,5 @@ async function sendGlobalNotification() {
         hideLoading();
     }
 }
+
+

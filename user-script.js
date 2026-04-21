@@ -7,9 +7,74 @@ function checkFirstVisit() {
         document.getElementById('welcomeModal').style.display = 'flex';
     } else {
         // Agar naam hai, toh loader ke baad data dikhao
-        loadUserData();
+        //nloadUserData();
     }
 }
+
+
+
+let localDB;
+const dbName = "StockMasterDB";
+
+function initIndexedDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, 1);
+
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            // 'stock' naam ka store banayenge
+            if (!db.objectStoreNames.contains("stock")) {
+                db.createObjectStore("stock", { keyPath: "id" });
+            }
+        };
+
+        request.onsuccess = (e) => {
+            localDB = e.target.result;
+            resolve(localDB);
+        };
+
+        request.onerror = (e) => reject("IndexedDB Error: " + e.target.errorCode);
+    });
+}
+
+
+// Cloud se aaya data save karne ke liye
+function saveToLocal(data) {
+    const transaction = localDB.transaction(["stock"], "readwrite");
+    const store = transaction.objectStore("stock");
+    // Password hata kar sirf inventory save karein
+    const { adminPass, ...inventoryOnly } = data; 
+    store.put({ id: "mainInventory", content: inventoryOnly });
+}
+
+// Local se data uthane ke liye
+/*function getLocalData() {
+    return new Promise((resolve) => {
+        const transaction = localDB.transaction(["stock"], "readonly");
+        const store = transaction.objectStore("stock");
+        const request = store.get("mainInventory");
+        request.onsuccess = () => resolve(request.result ? request.result.content : null);
+    });
+}*/
+
+function getLocalData() {
+    return new Promise((resolve) => {
+        const transaction = localDB.transaction(["stock"], "readonly");
+        const store = transaction.objectStore("stock");
+        const request = store.get("mainInventory");
+        
+        request.onsuccess = () => {
+            if (request.result) {
+                // Agar aapne .content ke andar save kiya tha, toh vahi bhejein
+                resolve(request.result.content); 
+            } else {
+                resolve(null);
+            }
+        };
+    });
+}
+
+
 
 // 2. Save Name Function
 function saveUserName() {
@@ -73,21 +138,100 @@ function showUserSkeleton() {
     `;
 }
 
-// --- 2. CLOUD LOAD ---
 async function loadUserData() {
     showUserSkeleton();
-    try {
-        const doc = await db.collection("stock").doc("mainInventory").get();
-        if (doc.exists) {
-            inventory = doc.data();
-            currentPath = [inventory];
-            renderUserPage();
+    await initIndexedDB(); 
+
+    let localData = await getLocalData(); 
+    let localTS = 0;
+
+    // Safety Check: Format badalne par crash na ho
+    if (localData) {
+        // Agar localData mein 'content' hai toh naya format, warna purana format
+        inventory = localData.content ? localData.content : localData;
+        localTS = localData.lastUpdated ? localData.lastUpdated : 0;
+        
+        currentPath = [inventory]; 
+        renderUserPage(); // Local data turant dikhao
+    }
+
+    if (navigator.onLine) {
+        try {
+            const doc = await db.collection("stock").doc("mainInventory").get();
+            if (doc.exists) {
+                const cloudData = doc.data();
+                
+                // Cloud data check (content aur lastUpdated ke sath)
+                if (cloudData.content && cloudData.lastUpdated) {
+                    if (cloudData.lastUpdated > localTS) {
+                        console.log("☁️ Syncing New Data...");
+                        inventory = cloudData.content;
+                        saveToLocal(cloudData); // Pura object save karein
+                        currentPath = [inventory];
+                        renderUserPage();
+                    } else {
+                        console.log("✅ Already up to date.");
+                    }
+                } else {
+                    // Agar cloud par abhi tak naya format nahi hai, toh purana format use karein
+                    inventory = cloudData;
+                    renderUserPage();
+                }
+            }
+        } catch (e) {
+            console.error("Sync Error:", e);
+            // Agar cloud fail ho jaye toh kam se kam skeleton hat jaye
+            if (inventory) renderUserPage();
         }
-    } catch (e) { 
-        console.error("Error:", e); 
-        document.getElementById('displayArea').innerHTML = "<p style='text-align:center; padding:20px;'>Connection Error. Please refresh.</p>";
     }
 }
+
+
+// --- 2. CLOUD LOAD ---
+
+
+async function checkAdminAccess(event) {
+    if (event.key === "Enter") {
+        const inputVal = event.target.value.trim();
+
+        // 1. Condition: 10 Chars Check
+        if (inputVal.length === 10) {
+            
+            // 2. Condition: Strict Online Check
+            if (!navigator.onLine) {
+                event.target.value = ''; 
+                return;
+            }
+
+            try {
+                console.log("Verifying with Live Cloud...");
+                const doc = await db.collection("appSettings").doc("security").get();
+                
+                if (doc.exists) {
+                    const cloudPass = doc.data().adminPass;
+                    
+                    if (inputVal === cloudPass) {
+                        event.target.value = ''; // Input clear karein
+
+                        // 🎫 TICKET ISSUE: Yeh sabse zaroori step hai security ke liye
+                        sessionStorage.setItem('isAdminAuthenticated', 'true');
+                        
+                        // 🚀 REDIRECT: Ticket milne ke baad hi admin par bhejein
+                        window.location.assign('admin.html'); 
+                    } else {
+                        // Agar password galat hai
+                        event.target.value = ''; 
+                        if (typeof handleSearch === "function") handleSearch(); 
+                    }
+                }
+            } catch (error) {
+                console.error("Auth Error:", error);
+            }
+        }
+    }
+} // Bracket sahi se close ho gaya
+
+
 
 // --- 3. NAVIGATION & BREADCRUMB FIX ---
 function openFolder(idx) {
@@ -106,7 +250,9 @@ function renderUserPage() {
     const active = currentPath[currentPath.length - 1];
     const area = document.getElementById('displayArea');
     const breadcrumbArea = document.getElementById('breadcrumb');
-
+    if (!active || (active.name === "Home" && active.children.length === 0)) {
+    return;
+}
     // Breadcrumb Update (Fix for crumb link)
     breadcrumbArea.innerHTML = '';
     currentPath.forEach((node, idx) => {
@@ -152,50 +298,30 @@ function renderUserPage() {
 }
 
 // --- 5. SEARCH LOGIC (Universal) ---
+
 function toggleSearch() {
-    const s = document.getElementById('searchWrapper');
+    const searchWrapper = document.getElementById('searchWrapper');
+    const breadcrumb = document.getElementById('breadcrumb');
     const input = document.getElementById('searchInput');
-    if (s.style.display === 'none' || s.style.display === '') {
-        s.style.display = 'block';
+    
+    // Agar Search hidden hai, toh dikhao aur breadcrumb chhupao
+    if (searchWrapper.style.display === 'none' || searchWrapper.style.display === '') {
+        breadcrumb.style.display = 'none';
+        searchWrapper.style.display = 'block';
         input.focus();
-    } else {
-        s.style.display = 'none';
+    } 
+    // Agar Search khula hai, toh use band karo aur breadcrumb wapas lao
+    else {
+        searchWrapper.style.display = 'none';
+        breadcrumb.style.display = 'block';
         input.value = '';
+        
+        // Agar admin panel hai toh render(), user page hai toh 
         renderUserPage();
+        if (typeof render === "function") render(); 
+        else if (typeof renderUserPage === "function") renderUserPage();
     }
 }
-
-/*function handleSearch() {
-    const term = document.getElementById('searchInput').value.toLowerCase();
-    const area = document.getElementById('displayArea');
-    if (!term) { renderUserPage(); return; }
-    
-    const results = [];
-    const searchRecursive = (node, path = []) => {
-        let pathString = path.length > 0 ? path.map(n => n.name).join(' > ') : "Home";
-        if (node.name.toLowerCase().includes(term) && node.name !== "Home") {
-            results.push({ node, pathString });
-        }
-        if (node.children) node.children.forEach(c => searchRecursive(c, [...path, node]));
-    };
-    
-    searchRecursive(inventory, []);
-    area.innerHTML = '';
-    results.forEach((res) => {
-        const div = document.createElement('div');
-        div.className = 'item-card';
-        const isInBucket = bucket.some(b => b.name === res.node.name && b.path === res.pathString);
-        div.innerHTML = `
-            <div style="flex:1">
-                <small style="color:gray; font-size:0.7rem">${res.pathString}</small><br>
-                <div class="item-name"><span>🔹 ${res.node.name}</span></div>
-            </div>
-            <div class="actions">
-                ${isInBucket ? '✅' : `<button class="btn-bucket-add" onclick="addFromSearch('${res.node.name}', '${res.pathString}')">🛒+</button>`}
-            </div>`;
-        area.appendChild(div);
-    });
-}*/
 
 
 // --- 6. BUCKET / CART LOGIC ---
@@ -757,33 +883,27 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
 function handleSearch() {
-const term = document.getElementById('searchInput').value.trim();    const area = document.getElementById('displayArea');
-    
-    // Admin Redirect logic (Keep it as is)
-if (correctAdminPass && term === correctAdminPass) {
-        // Clear input before redirecting so back button doesn't show it
-        document.getElementById('searchInput').value = ''; 
-        window.location.href = 'admin.html';
-        return;
-    }
+    const term = document.getElementById('searchInput').value.trim();
+    const area = document.getElementById('displayArea');
     const lowerTerm = term.toLowerCase();
+
+    // --- YAHAN SE ADMIN REDIRECT WALA IF/ELSE BILKUL HATA DIYA HAI ---
+    
     if (!lowerTerm) {
         renderUserPage();
         return;
     }
     
     const results = [];
-    const seenItems = new Set(); // Duplicates track karne ke liye set
+    const seenItems = new Set();
 
     const searchRecursive = (node, path = []) => {
         let pathString = path.length > 0 ? path.map(n => n.name).join(' > ') : "Home";
-        
-        // Unique ID banayein (Path + Name) taaki duplicate detect ho sake
         const itemID = `${pathString} > ${node.name}`;
 
         if (node.name.toLowerCase().includes(lowerTerm) && node.name !== "Home" && !seenItems.has(itemID)) {
             results.push({ node, pathString, hierarchy: [...path, node] });
-            seenItems.add(itemID); // Is item ko "seen" mark karein
+            seenItems.add(itemID);
         }
         
         if (node.children) {
@@ -900,7 +1020,7 @@ function getSmartName(item) {
 }*/
 // Page load par call karein
 listenForAdminNotifications();
-function triggerAppNotification(title, message) {
+/*function triggerAppNotification(title, message) {
     // Browser check ki kya notifications supported hain
     if (!("Notification" in window)) {
         console.log("This browser does not support desktop notification");
@@ -931,7 +1051,228 @@ function triggerAppNotification(title, message) {
             }
         });
     }
+}*/
+
+function playNotificationSound() {
+    const sound = document.getElementById('notificationSound');
+    if (sound) {
+        sound.currentTime = 0; // Har baar shuru se bajega
+        sound.play().catch(error => {
+            console.warn("Sound play block ho gaya (Browser Policy):", error);
+        });
+    }
 }
+
+
+function triggerAppNotification(title, message) {
+    // 1. 'Notification' check karne ke liye 'window.' ka use karein
+    playNotificationSound(); 
+    if (!("Notification" in window)) {
+        console.warn("This browser does not support notifications.");
+        return;
+    }
+
+    // 2. Permission check
+    if (window.Notification.permission === "granted") {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(title, {
+                    body: message,
+                    icon: 'app-icon.png',
+                    badge: 'app-icon.png',
+                    vibrate: [100, 50, 100]
+                });
+            });
+        } else {
+            // Fallback for simple browsers
+            new window.Notification(title, { body: message });
+        }
+    } 
+    // 3. Agar permission nahi mili toh maangein
+    else if (window.Notification.permission !== "denied") {
+        window.Notification.requestPermission();
+    }
+}
+/*function triggerAppNotification(title, message) {
+    console.log("Attempting to send notification: " + title); // Debugging
+
+    if (!("Notification" in window)) {
+        console.log("Notifications not supported");
+        return;
+    }
+
+    if (window.Notification.permission === "granted") {
+        console.log("Permission is granted, checking service worker...");
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(title, {
+                    body: message,
+                    icon: 'app-icon.png'
+                });
+                console.log("Notification sent via Service Worker");
+            });
+        } else {
+            console.log("Service Worker not ready, using fallback");
+            new window.Notification(title, { body: message });
+        }
+    } else {
+        console.log("Permission status: " + window.Notification.permission);
+        window.Notification.requestPermission();
+    }
+}*/
+
+function startCloudSync() {
+    db.collection("stock").doc("mainInventory").onSnapshot(doc => {
+        if (doc.exists) {
+            let cloudData = doc.data();
+            
+            // SECURITY: Password ko local cache mein save hone se pehle delete karo
+            if (cloudData.adminPass) delete cloudData.adminPass; 
+            
+            inventory = cloudData;
+            saveToDB('inventory', inventory); // Ab bina password wala data save hoga
+            renderUserPage();
+        }
+    });
+}
+
+
+// 1. App start hote hi initial state set karein
+// A. Sabse upar global variable
+let lastBackPress = 0;
+
+// B. Load hote hi pehli state register karein
+window.addEventListener('load', () => {
+    history.replaceState({ type: 'home' }, ""); 
+});
+
+// C. openFolder function ko update karein
+function openFolder(idx) {
+    const selectedFolder = currentPath[currentPath.length - 1].children[idx];
+    currentPath.push(selectedFolder);
+    
+    // Nayi state push karein
+    history.pushState({ type: 'folder' }, "");
+    renderUserPage();
+}
+
+// D. Master Back Button Listener (Sabse niche add karein)
+window.addEventListener('popstate', (event) => {
+    const sWrapper = document.getElementById('searchWrapper');
+    const bView = document.getElementById('bucketView');
+
+    // 1. Agar Search khula hai
+    if (sWrapper && sWrapper.style.display === 'block') {
+        toggleSearch(); 
+        return;
+    }
+
+    // 2. Agar Bucket View khula hai
+    if (bView && bView.style.display === 'flex') {
+        hideBucketScreen();
+        return;
+    }
+
+    // 3. Agar Folder ke andar hain
+    if (currentPath.length > 1) {
+        currentPath.pop();
+        renderUserPage();
+    } else {
+        // 4. Home par Exit Confirmation
+        let now = Date.now();
+        if (now - lastBackPress < 2000) {
+            // Do baar jaldi dabane par exit (PWA mode mein work karega)
+            // Browser mein ye aksar pichle page par le jata hai
+        } else {
+            lastBackPress = now;
+            showExitToast(); // Toast function niche hai
+            history.pushState({ type: 'home' }, ""); // State wapas dalo taaki app band na ho
+        }
+    }
+});
+
+function showExitToast() {
+    let toast = document.getElementById('exitToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'exitToast';
+        toast.className = 'exit-toast';
+        toast.innerText = "Press back again to exit";
+        document.body.appendChild(toast);
+    }
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// 2. Folder Open Logic update karein
+function openFolder(idx) {
+    const selectedFolder = currentPath[currentPath.length - 1].children[idx];
+    currentPath.push(selectedFolder);
+    
+    // History mein folder state push karein
+    history.pushState({ type: 'folder', depth: currentPath.length }, "");
+    renderUserPage();
+}
+
+// 3. Search aur Bucket Toggle mein bhi history add karein
+const originalToggleSearch = toggleSearch;
+toggleSearch = function() {
+    originalToggleSearch();
+    const sWrapper = document.getElementById('searchWrapper');
+    if (sWrapper.style.display === 'block') {
+        history.pushState({ type: 'search' }, "");
+    }
+};
+
+const originalShowBucket = showBucketScreen;
+showBucketScreen = function() {
+    originalShowBucket();
+    history.pushState({ type: 'bucket' }, "");
+};
+
+// 4. MASTER BACK BUTTON LISTENER
+window.addEventListener('popstate', (event) => {
+    const sWrapper = document.getElementById('searchWrapper');
+    const bView = document.getElementById('bucketView');
+
+    // A. Agar Search khula hai toh band karo
+    if (sWrapper && sWrapper.style.display === 'block') {
+        toggleSearch(); 
+        return;
+    }
+
+    // B. Agar Bucket View khula hai toh band karo
+    if (bView && bView.style.display === 'flex') {
+        hideBucketScreen();
+        return;
+    }
+
+    // C. Agar Folder ke andar hain toh piche jao
+    if (currentPath.length > 1) {
+        currentPath.pop();
+        renderUserPage();
+    } else {
+        // Home par hain, toh browser default exit hone dega
+        let lastBackPress = 0;
+        function showExitToast() {
+    let toast = document.querySelector('.exit-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.className = 'exit-toast';
+        toast.innerText = "Press back again to exit Stock-Master";
+        console.log("exit");
+        document.body.appendChild(toast);
+    }
+    
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+    }
+});
+
+
 function startVoiceSearch() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -983,8 +1324,8 @@ function startVoiceSearch() {
     recognition.start();
 }
 function listenForAdminNotifications() {
+    if (!navigator.onLine) return; 
     db.collection("notifications").doc("latest").onSnapshot(doc => {
-        console.log("Notif Data received:", doc.data()); // Check karein console mein
         if (doc.exists) {
             const data = doc.data();
             const lastRead = localStorage.getItem('last_notif_time');
@@ -994,6 +1335,76 @@ function listenForAdminNotifications() {
                 localStorage.setItem('last_notif_time', data.timestamp);
             }
         }
+    }, error => {
+        console.log("Offline: Notification sync skipped.");
     });
 }
 
+
+
+// user-script.js ke bilkul niche ye add karein
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('keydown', (event) => {
+            // Aapka pehle se bana hua function yahan call hoga
+            checkAdminAccess(event); 
+        });
+    }
+});
+
+
+
+// 1. User Name Fetch (LocalStorage se)
+const activeUserName = localStorage.getItem('sm_user_name') || "User";
+
+// 2. Offline Mode Logic
+window.addEventListener('offline', () => {
+    console.log("Network status: Offline 🔴");
+
+    const title = "Connection Lost!";
+    const message = `Hey ${activeUserName}, looks like the internet took a break. Don't worry, Stock-Master is still running on local power! 🚀`;
+
+    // Existing trigger function call karein
+    if (typeof triggerAppNotification === "function") {
+        triggerAppNotification(title, message);
+    }
+
+    // UI Feedback: Search bar ko disable ya red border de sakte hain
+    const sInput = document.getElementById('searchInput');
+});
+
+// 3. Online Mode Logic
+window.addEventListener('online', () => {
+    console.log("Network status: Online 🟢");
+
+    const title = "Back Online!";
+    const message = `Great news ${activeUserName}! Your connection is restored. Data is now syncing with the cloud. 🌐`;
+
+    if (typeof triggerAppNotification === "function") {
+        triggerAppNotification(title, message);
+    }
+
+    // UI Reset
+    const sInput = document.getElementById('searchInput');
+    if (sInput) sInput.style.borderColor = "var(--border-base)";
+
+    // Background mein data sync (Agar IndexedDB use kar rahe hain toh)
+    if (typeof loadUserData === "function") {
+        loadUserData(); 
+    }
+});
+window.addEventListener('pageshow', (event) => {
+    const sInput = document.getElementById('searchInput');
+    if (sInput) {
+        sInput.value = ''; // Input clear karein
+    }
+    // Search bar band karke breadcrumb wapas lao
+    const searchWrapper = document.getElementById('searchWrapper');
+    const breadcrumb = document.getElementById('breadcrumb');
+    if (searchWrapper && breadcrumb) {
+        searchWrapper.style.display = 'none';
+        breadcrumb.style.display = 'block';
+    }
+    renderUserPage();
+});

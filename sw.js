@@ -9,8 +9,8 @@ self.addEventListener('fetch', (e) => {
 });
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
-    // Notification par click karne se app khulegi
     event.waitUntil(
         clients.openWindow('/')
     );
 });
+

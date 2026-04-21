@@ -15,8 +15,26 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <script>
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Firebase v9 Compat mode ke liye sahi settings
+db.settings({
+    cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+});
+
+// Purana persistent method hi use karein, ye v9 mein stable hai
+db.enablePersistence({ synchronizeTabs: true })
+    .catch((err) => {
+        if (err.code == 'failed-precondition') {
+            console.warn("Multiple tabs open, persistence limited to one tab.");
+        } else if (err.code == 'unimplemented') {
+            console.warn("Browser does not support offline persistence.");
+        }
+    });
+
+
+
     </script>
 </head>
 <body>
@@ -50,22 +68,21 @@
                 </div>
             </div>
 
-            <div class="header-row">
-                <div id="breadcrumb" class="breadcrumb">🏠 Home</div>
-            </div>
+            
 
-           <div id="searchWrapper" class="search-box" style="display: none;">
-    <div style="position: relative; width: 100%;">
-        <input type="text" id="searchInput" placeholder="Search items..." oninput="handleSearch()" 
-               style="width: 100%; padding-right: 45px;"> <button id="voiceSearchBtn" onclick="startVoiceSearch()" 
-                style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); border: none; background: transparent; font-size: 22px; cursor: pointer; padding: 0; line-height: 1;">
-            <svg id="micSvgIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-mic" style="color: var(--primary);">
-    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-    <path d="M19 10v1a7 7 0 0 1-14 0v-1"></path>
-    <line x1="12" y1="19" x2="12" y2="23"></line>
-    <line x1="8" y1="23" x2="16" y2="23"></line>
-</svg>
-        </button>
+          <div class="header-action-area" style="position: relative; min-height: 45px; display: flex; align-items: center;">
+    
+    <div id="breadcrumb" class="breadcrumb" style="width: 100%; margin: 0;">
+        </div>
+
+    <div id="searchWrapper" class="search-box" style="display: none; width: 100%; margin: 0;">
+        <div style="position: relative; width: 100%;">
+            <input type="text" id="searchInput" placeholder="Search items..." oninput="handleSearch()" style="width: 100%; padding-right: 45px;">
+            <button id="voiceSearchBtn" onclick="startVoiceSearch()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); border: none; background: transparent;">
+                
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="feather feather-mic"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v1a7 7 0 0 1-14 0v-1"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            </button>
+        </div>
     </div>
 </div>
 
@@ -83,6 +100,7 @@
     </div>
 
     <div id="image-capture-container" style="position: absolute; left: -2000px; visibility: hidden;"></div>
+<audio id="notificationSound" src="notification.mp3" preload="auto"></audio>
 
     <script>
         if ('serviceWorker' in navigator) {
