@@ -1,1070 +1,1767 @@
-/* --- 1. System Variables (Theme) --- */
-/*@import url('https://fonts.googleapis.com/css2?family=Iosevka+Fixed:wght@400;700&display=swap');*/
-
-:root {
-    --primary: #2563eb;      /* Professional Blue */
-    --primary-dark: #1d4ed8;
-    --success: #059669;      
-    --danger: #e11d48;       
-    --dark: #0f172a;         
-    --text-main: #1e293b;    
-    --text-sec: #64748b;     
-    --bg-main: #f8fafc;      /* Aur bhi clean light grey */
-    --border-base: #e2e8f0;
-    --font-main: 'Iosevka Fixed', monospace;
-
-}
-/* Iosevka style font import */
-
-
-
-/* Inputs ke liye special selection allow karein taaki copy-paste ho sake */
-input, textarea {
-    user-select: text !important;
-    font-family: var(--font-main) !important;
-}
-
-/* Poori app se blue tap highlight aur text selection hatane ke liye */
-
-/* Sirf inputs aur textareas mein selection allow karein taaki typing ho sake */
-input, textarea {
-    user-select: text !important;
-    -webkit-tap-highlight-color: rgba(0,0,0,0.05); 
-}
-
-/* Long press feedback ke liye ek halka animation */
-.item-card:active {
-    transform: scale(0.98);
-    background-color: #f1f5f9;
-    transition: 0.1s;
-}
-
 
 * { 
-      -webkit-tap-highlight-color: transparent; /* Blue color hatane ke liye */
-    -webkit-touch-callout: none;  
-        user-select: none !important;
-    -webkit-user-select: none !important;
-    /* iOS menu hatane ke liye */
-    box-sizing: border-box; 
     margin: 0; 
     padding: 0; 
-    color: var(--text-main);
-    /*font-family: 'Inter', system-ui, -apple-system, sans-serif !important;*/
-    -webkit-font-smoothing: antialiased;
-      /* font-family: var(--font-main) !important; */
-     font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace !important;
-}
-input{
-    user-select: text !important;
-}
-body { 
-    margin: 0;
-    padding: 0;
-    height: 100vh;
-    overflow: hidden; /* Bahar ka scroll bilkul band */
-    background-color: var(--bg-main);
-    display: flex;
-    justify-content: center;
+    box-sizing: border-box; 
+    -webkit-tap-highlight-color: transparent;
 }
 
-.container { 
-    width: 100%; 
-    max-width: 450px; 
-    background: white; 
-    /* 100dvh (Dynamic Viewport Height) mobile ke liye best hai */
-    height: 100dvh; 
-    display: flex; 
-    flex-direction: column; 
-    position: relative;
+:root {
+    /* 🎨 NEW THEME: Deep Slate Indigo & Luxury Executive Colors */
+    --primary: #4f46e5;          /* Premium Indigo instead of basic blue */
+    --primary-dark: #4338ca;
+    --success: #10b981;          /* Emerald Success Tint */
+    --danger: #f43f5e;           /* Rose Alert Accent */
+    --dark: #0f172a;             /* Dark Slate Core */
+    --text-main: #1e293b;    
+    --text-sec: #64748b;     
+    --bg-main: #f8fafc;      
+    --border-base: #e2e8f0;
+    --font-main: 'Iosevka Fixed', 'ui-monospace', 'SFMono-Regular', monospace;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
     overflow: hidden;
-    padding: 12px;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-family: var(--font-main);
+    -webkit-font-smoothing: antialiased; 
+    text-rendering: optimizeLegibility;
 }
-.list-container, 
-.order-list, 
-.history-list { 
-    flex: 1;            /* Ye area bachi hui poori jagah le lega */
-    overflow-y: auto;   /* Sirf yahi area scroll hoga */
-    padding-bottom: 30px; /* Selection bar ke liye niche jagah chhodein */
-    -webkit-overflow-scrolling: touch; /* Mobile par smooth scroll ke liye */
-    
+
+/* ==========================================================================
+   --- 🎨 SCROLL-SAFE SELECTION RESET (style.css) ---
+   ========================================================================== */
+
+/* 🔑 THE ABSOLUTE TEXT HIGHLIGHT LOCK:
+   Cards aur list rows ke andar kisi bhi text node par long press selection ko jad se block kiya,
+   lekin structural containers ko free rakha he taaki webkit-scrolling engine 100% smooth chale! */
+.item-name, 
+.cart-item-name, 
+.search-row-text,
+.step-title-text,
+.inventory-card,
+.inventory-card * {
+    -webkit-user-select: none !important;      /* Safari/Chrome Mobile */
+    -webkit-touch-callout: none !important;    /* iOS long-press menu wrapper override */
+    -moz-user-select: none !important;         /* Firefox */
+    -ms-user-select: none !important;          /* Internet Explorer/Edge */
+    user-select: none !important;              /* Modern Browsers Standard Standard */
 }
-/* --- 2. Top Bar & Branding --- */
-.top-bar { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    margin-bottom: 12px; 
-    padding-bottom: 8px;
+
+/* Input boxes ko standard user entry ke liye touch azaad rakhna zaroori he */
+input, textarea {
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    user-select: text !important;
+}
+
+
+
+.main-header {
+    height: 56px;
+    width: 100%;
+    background-color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Isse naam left aur icons right ho jayenge */
+    padding: 0 16px;
     border-bottom: 1px solid var(--border-base);
 }
 
-h2 { font-size: 1.25rem; font-weight: 800; color: var(--dark); display: flex; align-items: center; gap: 8px; }
-h2 span { font-size: 1.4rem; } /* For 📦 icon */
-
-.top-actions { display: flex; gap: 10px; align-items: center; }
-
-.btn-icon-top { 
-    border: none; 
-    padding: 10px; 
-    border-radius: 12px; 
-    font-size: 1rem; 
-    cursor: pointer; 
-    background: #e2e8f0;
+.app-name {
+    font-size: 16px;
+    font-weight: 700;
     color: var(--dark);
-    transition: all 0.2s ease;
+    letter-spacing: 0.5px;
 }
-.btn-icon-top:hover { background: #cbd5e1; }
-.btn-icon-top:active { transform: scale(0.9);
-    opacity: 0.7;
-    transition: 0.1s;
-    }
 
-.bucket-nav { 
-    background: var(--primary); 
-    color: white; 
-    position: relative; 
+.header-actions {
+    display: flex;
+    gap: 8px; /* Icons ke beech ki jagah */
+}
+
+.icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    width: 38px;
+    height: 38px;
     display: flex;
     align-items: center;
-    gap: 4px;
-}
-.bucket-nav:hover { background: var(--primary-dark); }
-.bucket-nav #bucketBadge { 
-    position: absolute; 
-    top: -6px; 
-    right: -6px; 
-    background: var(--danger); 
-    color: white; 
-    font-size: 0.65rem; 
-    padding: 3px 6px; 
-    border-radius: 50%; 
-    font-weight: bold;
+    justify-content: center;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
 }
 
-/* --- 3. 3-Dot Dropdown Menu --- */
-.menu-container { position: relative; }
-.dropdown-menu {
-    position: absolute; 
-    right: 0; 
-    top: 48px; 
-    background: white; 
-    box-shadow: 0 10px 30px rgba(0,0,0,0.12); 
-    border-radius: 16px; 
-    z-index: 2000; 
-    min-width: 190px; 
-    overflow: hidden;
-    border: 1px solid var(--border-base);
-}
-.dropdown-menu button {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%; 
-    padding: 14px 18px; 
-    border: none; 
-    background: none; 
-    text-align: left; 
-    font-size: 0.95rem; 
-    color: var(--dark);
-    transition: all 0.2s ease;
-}
-.dropdown-menu button:hover { background: var(--bg-main); color: var(--primary); }
-.dropdown-menu button:active { background: #e2e8f0; }
-
-/* --- 4. Breadcrumb & Search --- */
-.breadcrumb { 
-    background: var(--bg-main); 
-    padding: 14px; 
-    border-radius: 16px; 
-    font-size: 0.85rem; 
-    border: 1px solid var(--border-base); 
-    white-space: nowrap; 
-    overflow-x: auto; 
-    margin-bottom: 15px;
-    color: var(--text-sec);
-}
-.crumb-link { color: var(--primary); cursor: pointer; font-weight: 700; text-decoration: none; transition: 0.2s; }
-.crumb-link:hover { color: var(--primary-dark); text-decoration: underline; }
-
-.search-box { margin-bottom: 15px; }
-#searchInput { 
-    width: 100%; 
-    padding: 14px; 
-    border: 2px solid var(--border-base); 
-    border-radius: 16px; 
-    outline: none; 
-    transition: 0.2s;
-    font-size: 1rem;
-}
-#searchInput:focus { border-color: var(--primary); background: #fdfdfd; }
-
-/* --- 5. Inventory List Cards --- */
-.list-container { 
-    flex: 1; 
-    overflow-y: auto; 
-    margin-bottom: 60px; /* Space for floating bar */
-    height: 100%;
+.icon-btn.active-icon {
+    color: var(--primary); /* Ya jo bhi color tumhein chahiye */
 }
 
-.item-card { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    padding: 12px 16px;
+.icon-btn:active {
+    background-color: #e2e8f0;
+}
+
+button, 
+.icon-btn, div {
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.menu-dropdown {
+    position: absolute;
+    background: white;
+    transform-origin: top right; 
+    opacity: 0;
+    transform: scale(0); 
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    display: block !important; 
+    
+    
+    top: 5px;
+    right: 10px;
+    min-width: 180px;
     border-radius: 12px;
-    background: #ffffff;
-    border: 1px solid #edf2f7;
-    /* Clean shadow */
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    margin-bottom: 8px; 
-    box-shadow: var(--card-shadow);
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-.item-card:hover { border-color: #cbd5e1; }
-.item-card.multi-selected { 
-    border: 2px solid var(--primary) !important;
-    background-color: #f0f7ff !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    border: 1px solid var(--border-base);
+    z-index: 99999;
+    padding: 6px;
+    flex-direction: column; 
 }
 
-.item-name { display: flex; align-items: center; gap: 12px;
+.menu-dropdown.active {
+    opacity: 1;
+    transform: scale(1); 
+    pointer-events: auto;
+    display: flex !important;
 }
-.item-name span.icon { font-size: 1.2rem; }
-.item-name span.text { font-weight: 600; font-size: 1rem; color: var(--dark); }
 
-.btn-bucket-add { 
-    background: #fdfdfd; 
-    border: 2px solid var(--success); 
-    color: var(--success);
-    padding: 8px 12px; 
-    border-radius: 12px; 
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: bold;
+.menu-item:last-child {
+    margin-bottom: 0;
+}
+
+.menu-icon {
+    font-size: 18px;
     display: flex;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
+    width: 24px; /* Fix width taaki text ek hi line mein align ho */
+}
+
+.main-header, .action-bar{
+    flex-shrink: 0; /* Inhe dabne mat dena */
+}
+
+.breadcrumb-container::-webkit-scrollbar {
+    display: none;
+}
+
+.root-node {
+    color: #3b82f6;
+    font-size: 15px; /* Size badha diya */
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
     transition: all 0.2s ease;
 }
-.btn-bucket-add:hover { background: #f0fdf4; color: #15803d; }
-.added-label { color: var(--success); font-weight: bold; font-size: 0.95rem; padding: 8px; }
 
-/* --- Floating Bar Upgrade --- */
-.selection-floating-bar { 
-    position: absolute; 
-    bottom: 15px; 
-    left: 10px; 
-    right: 10px; 
-    background: #1e293b; 
-    z-index: 500;
-    color: white; 
-    padding: 8px 12px; 
-    border-radius: 20px; 
-    display: flex; 
-    align-items: center; 
-    justify-content: space-between;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    z-index: 1000;
+.root-node:hover {
+    background: rgba(37, 99, 235, 0.08); /* Blue tint on hover */
+    color: #1d4ed8;
+}
+.root-node, .current-node {
+    flex-shrink: 0; /* YE ZAROORI HAI: Text kabhi dabe (shrink) nahi */
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
 }
 
-.selection-info { 
-    display: flex; flex-direction: column; align-items: center;
-    padding-right: 15px; border-right: 1px solid rgba(255,255,255,0.2);
-    min-width: 60px;
-}
-#selectCount { font-size: 1.3rem; font-weight: 800; color: #6366f1; line-height: 1; }
-.selection-info small { font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; margin-top: 2px; }
-
-.bar-btns { 
-    display: flex; flex: 1; justify-content: space-evenly; align-items: center; 
-    gap: 5px; padding: 0 10px;
-}
-
-.action-item { 
-    background: none; border: none; 
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    cursor: pointer; transition: 0.2s; min-width: 50px;
-}
-.action-item:active { transform: scale(0.9);
+.separator {
+    color: #cbd5e1;
+    display: flex;
+    align-items: center;
     opacity: 0.7;
-    transition: 0.1s;
-    }
-.action-item span { font-size: 1.2rem; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5)); }
-.action-item label { 
-    font-size: 0.6rem; color: #cbd5e1; font-weight: 600; 
-    text-transform: uppercase; letter-spacing: 0.5px;
 }
 
-.btn-close-bar { 
-    background: rgba(255,255,255,0.1); border: none; color: white; 
-    width: 35px; height: 35px; border-radius: 50%; 
-    display: flex; align-items: center; justify-content: center; cursor: pointer;
+.current-node {
+    color: #475569;
+    font-size: 12px;
+    font-weight: 200;
+    padding: 4px 8px;
+    background: #f8fafc; /* Halka grey background current location ke liye */
+    border-radius: 6px;
+    flex-shrink: 0;
 }
 
-/* --- 7. Modal & Views --- */
-.modal { 
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-    background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px);
-    display: flex; justify-content: center; align-items: center; z-index: 10000; 
+.breadcrumb-container.active {
+    display: flex;
+    align-items: center;
+    gap: 3px;
 }
-.modal-content { background: white; padding: 20px; border-radius: 20px; width: 90%; max-width: 400px; box-shadow: 0 15px 50px rgba(0,0,0,0.15);}
-.modal-content h3 { font-size: 1.2rem; font-weight: 800; color: var(--dark); margin-bottom: 20px; }
-.modal textarea { margin-bottom: 20px; font-size: 0.95rem;}
+.breadcrumb-container {
+    opacity: 1;
+    white-space: nowrap;
+    overflow-x: auto; 
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    transform: translateX(0);
+    visibility: visible;
+}
 
-.modal-btns { display: flex; gap: 10px; }
+.breadcrumb-container::-webkit-scrollbar {
+    display: none;
+}
 
+.breadcrumb-container.hidden {
+    opacity: 0;
+    transform: translateX(-10px); /* Halkasa slide left */
+    visibility: hidden;
+    display: none !important;
+}
 
-
-.view {
+.breadcrumb-container {
+    position: absolute;
+    top:0;
+    left: 0;
+    width: 100%;
     height: 100%;
+    display: flex !important; /* Hamesha flex rakhein, display:none mat use karein */
+    align-items: center;
+    padding: 0 16px;
+    transition: all 0.3s ease-in-out; /* Smooth transition */
+}
+
+.app-container {
+    width: 100vw;
+    height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden; /* Bahar ka window scroll strict locked */
+    position: relative;
+    box-sizing: border-box;
 }
 
-.view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-base); }
-.view-header h3 { font-size: 1.2rem; font-weight: 800; color: var(--dark); }
-.btn-close-view { background: none; border: none; font-size: 1.2rem; padding: 10px; cursor: pointer;}
-
-/* Bucket & Qty Input 
-.order-row { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    background: #fff;
-    margin-bottom: 0; 
-    padding: 8px 12px !important; 
-    border-bottom: 1px solid #f1f5f9 !important;
-}
-.order-row strong { color: var(--dark); font-weight: 700; 
-    font-size: 0.9rem;
-}
-.order-row small { font-size: 0.7rem; color: #888; }*/
-
-.qty-input { width: 60px; padding: 6px; border: 1px solid var(--border-base); border-radius: 6px; text-align: center; font-weight: bold; font-size: 0.9rem; height: 35px;}
-.qty-input:focus { border-color: var(--primary); }
-
-.btn-main-action { 
-    width: 100%; background: var(--primary); color: white; padding: 18px; 
-    border-radius: 18px; border: none; font-weight: bold; font-size: 1rem; margin-top: 20px; 
-    cursor: pointer; transition: 0.2s;
-}
-.btn-main-action:hover { background: var(--primary-dark); }
-.btn-main-action:active { transform: scale(0.98); }
-
-.btn-primary { width: 100%; background: var(--primary); color: white; padding: 14px; border-radius: 14px; border: none; font-weight: bold; cursor: pointer;}
-.btn-primary:hover { background: var(--primary-dark); }
-.btn-secondary { width: 100%; background: var(--bg-main); color: var(--dark); padding: 14px; border-radius: 14px; border: none; font-weight: bold; cursor: pointer;}
-.btn-secondary:hover { background: #cbd5e1; }
-
-
-/* --- New Professional History UI --- */
-.history-list {
-    padding: 10px 0;
-}
-
-.history-card-new {
-    background: #ffffff;
-    border: 1px solid #edf2f7;
-    border-radius: 16px;
-    margin-bottom: 10px;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-}
-
-.h-header {
-    background: #f8fafc;
-    padding: 8px 12px;
+.content-body {
+    flex: 1; /* Pure viewport ka bacha hua space legi */
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #edf2f7;
+    flex-direction: column;
+    overflow: hidden; /* Content area ko scroll handle karne ke liye boundary di */
+    width: 100%;
+    position: relative;
 }
 
-
-.h-date {
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: var(--dark);
-}
-
-.h-time {
-    font-size: 0.75rem;
-    color: var(--text-sec);
-}
-
-.h-count {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--primary);
-    background: #eef2ff;
-    padding: 4px 10px;
-    border-radius: 20px;
-}
-
-.h-body {
-    padding: 5px 12px;
-}
-
-.h-row {
+.main-content-area {
+    flex: 1; /* Body ke andar jitni space bachi he usko occupy karega */
+    width: 100%;
+    max-width: 100%;
+    
+    /* Strict viewport height subtraction mathematics */
+    height: calc(100vh - 106px); 
+    
+    overflow-y: scroll !important; /* Forces physical native scroll track */
+    -webkit-overflow-scrolling: touch !important; /* Mobile inertial smooth velocity glide */
+    
     display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid #f1f5f9;
+    flex-direction: column;
+    gap: 10px; 
+    box-sizing: border-box;
+    position: relative;
 }
 
-.h-row:last-child {
-    border-bottom: none;
+.main-content-area::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
-.h-name {
-    font-size: 0.9rem;
-    color: #475569;
+.search-wrapper:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
-.h-qty {
-    font-weight: 700;
-    font-size: 0.85rem;
-    color: var(--dark);
-}
-
-/* Clear History Button Redesign */
-.clear-btn {
-    background: #fff1f2;
-    color: #e11d48;
-    border: 1px solid #ffe4e6;
-    padding: 16px 10px;
-    border-radius: 10px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: 0.2s;
-}
-
-.clear-btn:hover {
-    background: #ffe4e6;
-}
-
-/* Fix for the new Inline '+' Button */
-.add-sub-inline {
-    background: var(--primary-light);
-    color: var(--primary);
+.search-wrapper input {
+    flex: 1;
     border: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    font-weight: bold;
-    margin: 1px;
+    background: transparent;
+    outline: none;
+    font-size: 14px;
+    height: 100%;
+    padding: 0;
+}
+
+.mic-btn {
+    background: transparent;
+    border: none;
+    color: var(--primary);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.4rem;
+    padding: 5px;
+    transition: transform 0.2s;
 }
 
-/* Fix for Bucket View Buttons */
-.order-list .btn-icon-top {
-    background: #fee2e2;
-    color: var(--danger);
-    padding: 5px 10px;
-    font-weight: bold;
-}
-
-/* Floating Bar Label spacing */
-.action-item label {
-    font-size: 0.65rem;
-    margin-top: 2px;
-    font-weight: 700;
-}
-/* style.css mein update karein */
-#addModal .modal-content {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-#addModal h3 {
-    margin-bottom: 2px;
-}
-
-#addModal small {
-    display: block;
-    margin-bottom: 10px;
-    color: var(--text-sec);
-    font-size: 0.85rem;
-}
-
-/*old #masterInput {
-    border: 2px solid var(--border-base);
-    border-radius: 12px;
-    min-height: 100px;
-    padding: 12px;
-    font-size: 1rem;
-    width: 100%;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
-}*/
-#masterInput {
-    border: 2px solid var(--border-base);
-    border-radius: 12px;
-    min-height: 120px;
-    padding: 15px;
-    font-size: 16px; /* Mobile par auto-zoom rokne ke liye 16px best hai */
-    width: 100%;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
-    resize: none;
-    background: #fafafa;
-}
-
-/* Modal ko mobile keyboard ke waqt thoda upar shift karne ke liye */
-@media (max-height: 500px) {
-    .modal-content {
-        transform: translateY(-20px);
-    }
-}
-
-
-
-/*.breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 15px;
-    background: #ffffff;
-    border-bottom: 1px solid #eee;
-    margin-bottom: 5px;
-    overflow-x: auto;
-    font-family: monospace; 
-}*/
-.crumb-link {
-    color: var(--primary);
-    font-weight: 700;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.breadcrumb-separator {
-    color: var(--text-sec);
-    padding: 0 4px;
-}
-
-/* Modal text overlap fix */
-.modal-content small {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 0.8rem;
-    color: var(--text-sec);
-}
-/* style.css mein purane grouping styles ko isse replace karein */
-
-.bucket-group-card {
-    background: #ffffff;
-    border: 1px solid var(--border-base);
-    margin: 1px;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.order-row:last-child {
-    border-bottom: none !important;
-}
-
-.qty-input:focus {
-    border-color: var(--primary) !important;
-    outline: none;
-    background: #f0f7ff;
-}
-
-.bucket-group-card .group-header {
-    background: #fdfdfd; /* White base */
-    color: var(--primary);
-    padding: 16px 20px;
-    font-weight: 800;
-    font-size: 0.95rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    border-bottom: 2px solid var(--bg-main); /* Light separator */
-}
-
-.group-header {
-    background: #ffffff;
-    color: var(--primary);
-    padding: 15px 0;
-    font-weight: 800;
-    font-size: 1.1rem;
-    border-bottom: 2px solid #f1f5f9;
-    margin-bottom: 15px;
-}
-
-
-.bucket-group-card .group-body {
-    padding: 10px 0px 20px 0px;
-}
-
-/* Image quality improvements for capture */
-.items-to-capture {
-    background: white;
-    font-size: 0.9rem;
-}
-
-.items-to-capture strong {
-    color: var(--dark);
-    font-size: 0.95rem;
-}
-
-.items-to-capture small {
-    color: var(--text-sec);
-    font-size: 0.75rem;
-}
-
-/* Skeleton Container */
-.loading-wrapper {
-    padding: 10px;
-    top: 0;
-    left: 0;
-    width: 100%;
-    background-color: white; /* Main page content chhupane ke liye */
-}
-
-/* Skeleton Base */
-
-.skeleton {
-    background: #f1f5f9;
-    background-image: linear-gradient(90deg, #f1f5f9 0px, #e2e8f0 40px, #f1f5f9 80px);
-    background-size: 600px 100%;
-    animation: skeleton-shimmer 1.2s infinite linear;
-    border-radius: 16px;
-    margin-bottom: 12px;
-    height: 70px; /* Item card ki height */
-    width: 100%;
-}
-
-@keyframes skeleton-shimmer {
-    0% { background-position: -100px 0; }
-    100% { background-position: 500px 0; }
-}
-
-.product-title {
-  font-weight: bold;
-  margin-top: 8px;
-  color: #444;
-}
-/*.clear-btn {
-  background: red;
-  color: white;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 6px;
-  margin: 10px;
-  cursor: pointer;
-}*/
-
-
-.h-item-container {
-    margin-bottom: 8px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #f1f5f9;
-}
-
-.h-item-container:last-child {
-    border-bottom: none;
-}
-
-.h-full-path {
-    font-size: 0.7rem;
-    color: var(--primary);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    margin-bottom: 2px;
-    opacity: 0.8;
-}
-
-.h-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.h-name {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--dark);
-}
-
-.h-qty {
-    font-weight: 800;
-    color: var(--text-sec);
-    background: #f1f5f9;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-}
-/* --- Professional Loader Styles --- */
-.loader-wrapper {
+.recording-overlay {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(15, 23, 42, 0.85); /* Dark transparent background */
+    backdrop-filter: blur(8px); /* Background blur */
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    color: white;
+}
+
+.recording-overlay.active { display: flex; }
+
+.voice-wave-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 60px;
+}
+
+#cart-section, 
+.full-page-section {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: 100%;
+    height: 100%;
+    background: #ffffff; /* Ekdum white background */
+    z-index: 3000;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#cart-section.active,.full-page-section.active {
+    right: 0;
+}
+
+.cart-header, .setting-header {
+    height: 60px;
+    display: flex;
     align-items: center;
-    z-index: 99999;
+    padding: 0 16px;
+    gap: 12px;
+    border-bottom: 1px solid #eee;
 }
 
-.loader {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid var(--primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 10px;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.loader-wrapper p {
-    font-size: 0.9rem;
+.cart-header h3 {
+    font-size: 18px;
     font-weight: 600;
-    color: var(--primary);
-}
-/* --- Professional Capture UI (Based on Screenshot) --- */
-
-
-
-.cap-section-body {
-    padding: 15px;
+    color: #1e293b;
+    font-family: sans-serif !important; /* Simple sans-serif jyada clean lagega */
 }
 
-
-.cap-card:last-child { margin-bottom: 0; }
-
-/* Container ko hide karne ka naya tareeka taaki rendering block na ho */
-#image-capture-container {
-    position: fixed;
-    top: 10px;    /* 0 ke bajaye thoda gap dein */
-    left: -2000px; /* Isse screen se bahar rahega par render hoga */
-    z-index: -999;
-    background: transparent;
-    pointer-events: none;
+.cart-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start; /* center se badal kar flex-start kiya, taaki cards upar se shuru hon */
+    padding: 10px 0px;           /* Top-bottom spacing set ki */
+    text-align: center;
+    overflow-y: auto;            /* Agar maal zyada ho toh smoothly scroll ho sake */
+    width: 100%;
 }
 
-/* Bucket list ko compact banane ke liye */
-.order-row { 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    padding: 8px 12px; /* Padding kam kar di */
-    border-bottom: 1px solid #eee; 
-    background: #fff;
-    margin-bottom: 0; /* Cards ke beech ka gap khatam */
+.empty-icon {
+    font-size: 80px;
+    margin-bottom: 10px;
+    opacity: 0.8;
+    display: inline-block; /* Animation smoothly kaam kare isliye */
+    
+    /* Ye line add karein */
+    animation: floatingCart 3s ease-in-out infinite;
 }
 
-.order-row strong { font-size: 0.9rem; } /* Text thoda chota */
-.order-row small { font-size: 0.7rem; color: #888; }
-
-.qty-input { 
-    width: 60px; 
-    padding: 6px; 
-    border: 1px solid #ccc; 
-    border-radius: 6px; 
-    font-size: 0.9rem;
-    height: 35px;
+.cart-body h2 {
+    font-size: 24px;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 8px;
+    font-family: sans-serif !important;
 }
 
-.bucket-group-card {
-    margin-bottom: 15px !important;
-    border-radius: 12px !important;
+.cart-body p {
+    color: #64748b;
+    font-size: 14px;
+    max-width: 280px;
+    margin-bottom: 30px;
+    line-height: 1.6;
+    font-family: sans-serif !important;
 }
 
-/* Toggle Switch Styling */
-.switch { position: relative; display: inline-block; width: 34px; height: 18px; }
-.switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
-.slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-input:checked + .slider { background-color: var(--success); }
-input:checked + .slider:before { transform: translateX(16px); }
-.toggle-container { text-align: center; margin-right: 5px; }
-/* Button ke andar loader ka style */
-.btn-loading {
-    position: relative;
-    color: transparent !important;
-    pointer-events: none;
-}
-
-.btn-loading::after {
-    content: "";
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    top: 50%;
-    left: 50%;
-    margin: -8px 0 0 -8px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-radius: 50%;
-    border-top-color: #fff;
-    animation: spin 0.8s linear infinite;
-}
-
-/* WhatsApp Button Style */
-.btn-whatsapp {
-    background: #25D366 !important;
-    color: white !important;
+.fun-btn {
+    background: #2563eb;
+    color: white;
     border: none;
-    padding: 12px 12px;
-    border-radius: 6px;
-    font-size: 12px;
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 15px;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
     cursor: pointer;
-    font-weight: bold;
+    transition: all 0.2s;
+    font-family: sans-serif !important;
 }
-/* --- Non-Blocking UI & Loaders --- */
 
-/* 1. Category Card Processing Overlay */
-.category-processing {
-    position: relative;
-    pointer-events: none; /* Card par click band ho jayega */
+.fun-btn:active {
+    transform: scale(0.96);
+    box-shadow: none;
+}
+
+@keyframes floatingCart {
+    0% {
+        transform: translateY(0px);
+        filter: drop-shadow(0 5px 5px rgba(0,0,0,0.1));
+    }
+    50% {
+        transform: translateY(-20px);
+        filter: drop-shadow(0 25px 15px rgba(0,0,0,0.05)); /* Shadow halki aur dur hogi */
+    }
+    100% {
+        transform: translateY(0px);
+        filter: drop-shadow(0 5px 5px rgba(0,0,0,0.1));
+    }
+}
+
+.alert-container {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 90%;
+    max-width: 400px;
+    pointer-events: none; /* Taaki clicks pass ho sakein agar alert na ho */
+}
+
+.custom-alert {
+    background: rgba(15, 23, 42, 0.9); /* Dark theme matching Way Stock */
+    backdrop-filter: blur(8px);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    pointer-events: auto;
+    
+    /* Animation logic */
+    animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(50px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.alert-error { border-left: 4px solid var(--danger); }
+
+.alert-success { border-left: 4px solid var(--success); }
+
+.alert-info { border-left: 4px solid var(--primary); }
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 4000;
+    padding: 20px;
+}
+
+.modal-overlay.active { display: flex; }
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.bulk-modal {
+    background: white;
+    width: 100%;
+max-width: 400px;
+    padding: 24px !important;    border-radius: 24px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    animation: modalSlide 0.3s ease-out;
+}
+
+@keyframes modalSlide {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+#modal-input {
+    width: 100%;
+    min-height: 150px; /* Kaafi jagah mil jayegi likhne ke liye */
+    padding: 15px;
+    background: #f1f5f9;
+    border: 2px solid transparent;
+    border-radius: 16px;
+    font-size: 15px;
+    font-family: 'ui-monospace', monospace !important; /* Code jaisa clean dikhega */
+    color: #1e293b;
+    resize: none;
+    outline: none;
     transition: all 0.3s ease;
 }
 
-.category-processing::before {
-    content: "⚙️ Generating Report...";
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(255, 255, 255, 0.85); /* White blur background */
-    backdrop-filter: blur(3px); /* Glass effect */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-weight: 800;
-    color: var(--primary);
-    z-index: 100;
-    border-radius: 12px;
-    font-size: 14px;
+#modal-input:focus {
+    background: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.1);
 }
 
-/* 2. Button Spinner (PNG/Share buttons ke liye) */
-.btn-loading {
-    position: relative;
-    color: transparent !important; /* Text chhupane ke liye */
-    pointer-events: none;
+.helper-text {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 8px;
+    font-weight: 500;
 }
 
-.btn-loading::after {
-    content: "";
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    top: 50%;
-    left: 50%;
-    margin: -8px 0 0 -8px; /* Center align */
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    border-top-color: white; /* Spinner ka color */
-    animation: spin-loader 0.8s linear infinite;
-}
-
-/* Spinner Animation */
-@keyframes spin-loader {
-    to { transform: rotate(360deg); }
-}
-
-/* WhatsApp Button Colors (Professional Share) */
-/*old .btn-whatsapp-image {
-    background: #075E54 !important; 
-    color: white !important;
-}
-
-.btn-whatsapp-text {
-    background: #25D366 !important;
-    color: white !important;
-}*/
-
-/* Bucket Buttons ko professional banane ke liye */
-.group-header div {
-    display: flex;
-    gap: 6px;
-}
-
-.group-header button {
-    padding: 5px 10px !important;
-    font-size: 11px !important;
-    border-radius: 6px !important;
-    font-weight: 600 !important;
-    text-transform: none !important;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(0,0,0,0.1);
-}
-
-/* Share Image Button */
-.btn-whatsapp-img {
-    background: #075E54 !important;
-    color: white !important;
-}
-
-/* PNG Button */
-.btn-png-dl {
-    background: var(--success) !important;
-    color: white !important;
-}
-/* Bucket Header ke Icon Buttons (Sober Look) */
-.group-header div.button-group {
-    display: flex;
-    gap: 4px; /* Buttons ekdum paas-paas honge */
-    align-items: center;
-    justify-content: flex-end; /* Right side stick honge */
-}
-
-.group-header .btn-icon {
-    width: 30px; /* Chhote aur square */
-    height: 30px;
-    padding: 0 !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px !important;
-    border: none !important;
-    font-size: 15px !important;
+.modal-submit-btn {
+    flex: 2; /* Ye zyada bada dikhega */
+    padding: 12px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 13px;
     cursor: pointer;
-    transition: background-color 0.2s, color 0.2s, transform 0.1s;
-    background: transparent !important; /* No background color */
-    color: var(--text-sec) !important; /* Simple Gray Icon */
 }
 
-/* Hover/Active effects */
-.group-header .btn-icon:hover {
-    background-color: #f1f5f9 !important; /* Subtle gray highlight */
-    color: var(--primary) !important; /* Icon turns primary color */
+.cancel-btn {
+    flex: 1; /* Ye thoda chota dikhega */
+    padding: 12px;
+    background: #f1f5f9; /* Halka grey background */
+    color: #64748b;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
 }
 
-.group-header .btn-icon:active {
-    transform: scale(0.92);
-    background-color: #e2e8f0 !important;
+.cancel-btn:active {
+    background: #e2e8f0;
 }
 
-/* Specific hover color WhatsApp ke liye */
-.group-header .btn-icon-wa:hover {
-    color: #25D366 !important;
+#modal-title{
+    padding: 12px;
+    color: var(--text-sec);
 }
 
-/* Loader support iconic buttons ke liye */
-.btn-loading::after {
-    border-top-color: var(--primary); /* Spinner primary color mein */
+@keyframes popIn {
+    0% { transform: translateY(30px) scale(0.9); opacity: 0; }
+    60% { transform: translateY(-5px) scale(1.02); opacity: 1; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 
-/* style.css mein update karein */
-html, body {
-    height: -webkit-fill-available; /* Mobile browser height fix */
-    margin: 0;
-    padding: 0;
-    overflow: hidden; /* Poora page na hile */
+@keyframes popOut {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(30px) scale(0.9); opacity: 0; }
 }
 
-#adminView, #historyView {
+.modal-overlay.active .bulk-modal {
+    animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.modal-overlay.closing .bulk-modal {
+    animation: popOut 0.3s ease-in forwards;
+}
+
+.setting-body {
+    padding: 20px;
+    height: calc(100% - 60px);
+    overflow-y: auto;
+}
+
+.content-body {
+    flex: 1; /* Bachi hui poori screen space lega */
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    height: -webkit-fill-available;
+    overflow: hidden; /* Iske andar scroll handle karenge */
 }
 
+.folder-icon { color: #f59e0b; fill: rgba(245, 158, 11, 0.1); }
+.item-icon { color: #818cf8; fill: rgba(129, 140, 248, 0.08); }
 
-/* Sirf aapki list scroll honi chahiye, poora page nahi */
-.list-container, #displayArea, #historyView {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling for iOS/Android */
-    height: 100%;
+.empty-inventory-container {
+    padding: 40px 20px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
 }
-/* style.css mein update karein */
 
-.list-container {
-    flex: 1;
+.empty-animation {
+    font-size: 50px;
+    margin-bottom: 20px;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+}
+
+.empty-inventory-container h2 {
+    font-size: 18px;
+    color: #1e293b;
+    margin-bottom: 8px;
+    font-weight: 700;
+}
+
+.empty-inventory-container p {
+    font-size: 14px;
+    color: #64748b;
+    margin-bottom: 25px;
+    max-width: 250px;
+}
+
+.add-inventory-fun-btn {
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    color: white;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 16px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);
+    transition: all 0.3s ease;
+}
+
+.add-inventory-fun-btn:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 15px 25px rgba(37, 99, 235, 0.3);
+}
+
+.add-inventory-fun-btn:active {
+    transform: scale(0.95);
+}
+
+@keyframes folderMorphIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.92); /* Chhota se bada hona */
+        filter: blur(4px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0);
+    }
+}
+
+.folder-morph-active {
+    animation: folderOpen 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes folderOpen {
+    0% {
+        opacity: 0;
+        transform: scale(0.92) translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.fun-toggle {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 18px;
+}
+
+.fun-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #cbd5e1; /* Slate color when off */
+    transition: .3s;
+    border-radius: 34px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 12px;
+    width: 12px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+input:checked + .toggle-slider {
+    background-color: var(--success); /* Green color */
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(16px);
+}
+
+.fun-toggle:active .toggle-slider:before {
+    width: 22px; /* Thoda stretch hoga click par */
+}
+
+.card-qty-controller {
+    display: flex;
+    align-items: center;
+    background: transparent; /* No heavy container background */
+    border: none;
+    padding: 0;
+    gap: 0px;
+}
+
+.card-qty-controller button:hover {
+    background: rgba(15, 23, 42, 0.1);
+}
+
+.card-qty-controller button:active {
+    transform: scale(0.9);
+    background: rgba(37, 99, 235, 0.15); /* Soft blue tint on click */
+    color: var(--primary);
+}
+
+.card-qty-controller input[type="number"]::-webkit-inner-spin-button,
+
+.card-qty-controller input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.cart-items-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
     overflow-y: auto;
-    /* Niche ki line ke liye extra space */
-    padding-bottom: env(safe-area-inset-bottom, 20px); 
-    
-    /* Agar niche buttons hain, toh 80px-100px padding rakhein */
-    padding-bottom: 100px; 
-    
+}
+
+.cart-item-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.02);
+}
+
+.cart-item-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    max-width: 50%; /* Text out-of-bound na ho */
+}
+
+.cart-item-name {
+    font-weight: 700;
+    font-size: 15px;
+    color: #0f172a;
+    text-transform: capitalize;
+}
+
+.cart-item-path {
+    font-size: 11px;
+    color: #64748b;
+    word-break: break-all;
+}
+
+.cart-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cart-unit-input {
+    width: 58px;
+    height: 32px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    color: #1e293b;
+    outline: none;
+    background: #f8fafc;
+    transition: border-color 0.15s ease;
+}
+
+.cart-unit-input:focus {
+    border-color: var(--primary);
+    background: #ffffff;
+}
+
+.cart-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    width: 100%;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.total-info {
+    font-size: 14px;
+    color: #475569;
+    font-weight: 500;
+}
+
+.total-info b {
+    color: var(--primary);
+    font-size: 16px;
+}
+
+.checkout-btn {
+    background: var(--primary);
+    color: #ffffff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+    transition: all 0.2s ease;
+}
+
+.checkout-btn:active {
+    transform: scale(0.97);
+    box-shadow: none;
+}
+
+.selection-toolbar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 56px;
+    background: #ffffff;
+    display: none; /* JS isko handle karega */
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
     box-sizing: border-box;
-    -webkit-overflow-scrolling: touch;
+    z-index: 99999;
+    border-bottom: 1px solid var(--border-base);
+    
+    /* --- 💎 ULTRA-PREMIUM SMOOTH TRANSITION STYLE --- */
+    opacity: 0;
+    transform: translateY(-4px); /* Halka sa upar se smooth transition scale */
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+                transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+             will-change: opacity, transform;
 }
-@keyframes jiggle {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.3); }
+
+.selection-toolbar-overlay.active-animation {
+    display: flex !important;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.sel-action-group .sel-btn, .sel-count-group {
+    transition: opacity 0.15s ease;
+}
+
+.selection-toolbar-overlay.closing-fade .sel-btn,
+.selection-toolbar-overlay.closing-fade .sel-count-group {
+    opacity: 0;
+}
+
+.sel-action-group .sel-btn {
+    animation: toolbarIconPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes toolbarIconPop {
+    0% { transform: scale(0.6); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.sel-count-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--dark);
+}
+
+.sel-action-group {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.sel-btn {
+    background: none;
+    border: none;
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    transition: color 0.1s ease;
+}
+
+.sel-btn:hover {
+    color: var(--primary);
+}
+
+.sel-btn.btn-close {
+    color: var(--text-sec);
+}
+
+.sel-btn.btn-close:hover {
+    color: var(--danger);
+}
+
+.sel-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+}
+
+#cart-btn {
+    position: relative;
+}
+
+.cart-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: var(--primary); /* Brand Blue Color */
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 800;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    animation: badgePop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes badgePop {
+    0% { transform: scale(0); }
     100% { transform: scale(1); }
 }
 
-.btn-bucket-add.added {
-    background-color: var(--success) !important;
-    color: white;
+.search-sober-row:last-child {
+    border-bottom: none;
 }
 
-.item-icon {
-    margin-right: 10px;
-    font-size: 1.2rem;
-}
-/* Voice Search Styles */
-#voiceSearchBtn {
-    transition: transform 0.2s ease, opacity 0.2s;
-    z-index: 10;
+.search-row-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b; /* Premium slate color */
 }
 
-#voiceSearchBtn:active {
-    transform: translateY(-50%) scale(0.9);
-    opacity: 0.7;
+.sober-search-dropdown {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    width: 100vw;
+    height: calc(100vh - 56px);
+    background: #ffffff;
+    z-index: 99998;
+    overflow-y: auto;
+    display: none;
+    flex-direction: column;
+    padding: 8px 0;
 }
 
-/* Jab Recording on ho (Red Dot) */
-.recording-active {
-    color: #e11d48;
-    animation: pulse 1s infinite;
+.search-history-header {
+    padding: 16px 20px 8px 20px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: #94a3b8;
+    font-weight: 800;
+    text-transform: uppercase;
 }
 
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
-}
-.header-action-area {
-    width: 100%;
-    margin-bottom: 10px;
-    padding: 0 5px;
-}
-
-/* Ye ensure karega ki breadcrumb aur search dono ek hi height lein */
-#breadcrumb, #searchWrapper {
-    height: 45px;
+.search-sober-row {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid #f1f5f9;
+    background: #ffffff;
+    transition: background 0.2s;
 }
 
-#searchInput {
-   height: 40px;
+.search-sober-row:active {
+    background: #f8fafc;
+}
+
+.search-row-left {
+    display: flex;
+    align-items: center;
+    gap: 16px; /* Icon aur text mein thoda gap */
+}
+
+.search-row-icon {
+    font-size: 18px;
+    width: 24px;
+    text-align: center;
+}
+
+.search-row-path {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+.status-badge-added {
+    font-size: 11px;
+    font-weight: 800;
+    color: #059669;
+    background: #ecfdf5;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #d1fae5;
+}
+
+.action-bar {
+    height: 50px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    position: relative;
+    z-index: 1000;
+    overflow: visible !important;
+}
+
+.search-container {
+    position: fixed; /* Fixed se ye poori top width cover karega[span_3](start_span)[span_3](end_span) */
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 56px; /* Exact Main Header ki height[span_4](start_span)[span_4](end_span) */
+    background: #ffffff;
+    display: flex !important;
+    align-items: center;
+    padding: 0 16px;
+    z-index: 99999; /* Sabse upar taaki icons hide ho jayein[span_5](start_span)[span_5](end_span) */
+    
+    /* Animation state[span_6](start_span)[span_6](end_span) */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-container.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.search-wrapper {
+    display: flex;
+    align-items: center;
+    background: #f1f5f9;
+    border-radius: 12px;
+    padding: 0 16px;
+    width: 100%;
+    height: 44px;
+    gap: 12px;
+    position: relative;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
     border-radius: 8px;
-    border: 1px solid var(--border-base);
-}
-.exit-toast {
-    position: fixed;
-    bottom: 50px;
-    left: 50%;
-    transform: translateX(-50%) translateY(100px);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 50px;
-    font-size: 13px;
-    z-index: 10000;
-    transition: transform 0.3s ease-out;
-    white-space: nowrap;
-    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-main);
+    font-size: 14px;
+    font-weight: 600;
 }
 
-.exit-toast.show {
-    transform: translateX(-50%) translateY(0);
+.menu-item:active {
+    background-color: #f1f5f9;
+}
+
+.inventory-card:active {
+    transform: scale(0.985);
+    background-color: #f8fafc !important;
+    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.01) !important;
+}
+
+.main-content-area {
+    /* 🔑 FIX 1: Flex context define kiya taaki height calculations automate hon */
+    flex: 1; 
+    width: 100%;
+    max-width: 100%;
+    
+    /* 🔑 FIX 2: Height: 100% ko badal kar 'scroll-viewport' control lock kiya.
+       Yeh browser ko batayega ki agar cards screen se bahar jayein toh scroll bars activate karo! */
+    height: calc(100vh - 106px); 
+    
+    overflow-y: auto !important; /* Forces native touch-scrolling activation */
+    -webkit-overflow-scrolling: touch; /* Mobile Smooth inertial scrolling momentum */
+    
+    padding: 12px 16px 100px 16px; /* Bottom padding 100px ki taaki aakhiri card floating buttons ke piche na dabe */
+    display: flex;
+    flex-direction: column;
+    gap: 10px; 
+    box-sizing: border-box;
+    position: relative;
+    
+    /* Hide Scrollbars completely */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.main-content-area::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+.inventory-card {
+    background: #ffffff !important;
+    border-radius: 14px !important; 
+    height: 64px !important; 
+    min-height: 64px !important; /* 🔑 CRITICAL FIX: Browser ko card height compress karne se rokega */
+    padding: 0 16px !important;
+    
+    display: flex !important;
+    align-items: center !important; 
+    justify-content: space-between !important;
+    position: relative !important; /* Stack context fix */
+    
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.02), 
+                0 1px 3px rgba(15, 23, 42, 0.03) !important;
+    border: 1px solid rgba(226, 232, 240, 0.9) !important;
+    
+    transition: transform 0.15s ease, background-color 0.15s ease;
+    box-sizing: border-box !important; 
+    margin-bottom: 2px !important; /* Clean explicit tracking margins */
+    width: 100% !important;
+    flex-shrink: 0 !important; /* 🔑 CRITICAL FIX: Overlap loop structural block */
+}
+
+/* ==========================================================================
+   --- 🪙 TWO-WAY 3D COIN FLICK ENGINE (style.css) ---
+   ========================================================================== */
+
+/* Selected Card Background Style */
+.inventory-card.selected-card {
+    background: #f5f3ff !important; /* Premium Soft Indigo Tint */
+    border-left: 4px solid var(--primary) !important; /* Deep Indigo indicator */
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.03) !important;
+    transition: background-color 0.25s ease, border-left 0.25s ease !important;
+}
+
+/* Parent Bounding Grid Frame with 3D Perspective */
+.inventory-card {
+    background: #ffffff !important;
+    border-radius: 14px !important; 
+    height: 64px !important; 
+    min-height: 64px !important;
+    padding: 0 16px !important;
+    display: flex !important;
+    align-items: center !important; 
+    justify-content: space-between !important;
+    position: relative !important;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.02) !important;
+    border: 1px solid rgba(226, 232, 240, 0.9) !important;
+    box-sizing: border-box !important; 
+    width: 100% !important;
+    flex-shrink: 0 !important;
+    
+    /* 🔑 3D DEPTH ENGINE */
+    perspective: 1000px !important; 
+    transform: translateZ(0); /* GPU acceleration */
+    transition: background-color 0.2s ease, border-left 0.2s ease;
+}
+
+/* 🪙 THE COIN WRAPPER: Adding smooth transition directly for two-way flipping */
+.card-icon-wrapper {
+    position: relative !important;
+    width: 24px !important;
+    height: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transform-style: preserve-3d !important; /* */
+    
+    /* 🔑 FIX: Transition ko wrapper par lagaya, isse select (0 to 180) aur deselect (180 to 0) dono waqt real motion dikhega! */
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important; 
+}
+
+/* 🔄 FLIP STATE: Card select hote hi wrapper smoothly 180deg Y-axis par flip ho jayega */
+.inventory-card.selected-card .card-icon-wrapper {
+    transform: rotateY(180deg) !important;
+}
+
+/* Front Face */
+.custom-type-icon {
+    width: 24px !important;
+    height: 24px !important;
+    position: absolute !important;
+    backface-visibility: hidden !important; /* */
+    -webkit-backface-visibility: hidden !important;
+    transform: rotateY(0deg) !important; 
+    z-index: 2 !important;
+}
+
+/* Back Face */
+.selection-tick-overlay {
+    position: absolute !important;
+    top: 0 !important; left: 0 !important;
+    width: 24px !important;  
+    height: 24px !important; 
+    background: #e0e7ff !important; /* Soft Premium Light Indigo */
+    color: var(--primary) !important; /* Deep Indigo text */
+    border: 1px solid #c7d2fe !important; 
+    font-size: 11px !important; 
+    font-weight: 900 !important;
+    border-radius: 50% !important; 
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    backface-visibility: hidden !important; /* */
+    -webkit-backface-visibility: hidden !important;
+    transform: rotateY(180deg) !important; /* */
+    z-index: 1 !important;
+}
+
+/* 🔑 FIRST-TIME POP ACTION: Toolbar icons par animation tabhi chalega jab toolbar pehli baar .first-load ke sath khulega */
+.selection-toolbar-overlay.first-load .sel-btn {
+    animation: toolbarIconPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes toolbarIconPop {
+    0% { transform: scale(0.6); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+
+.card-left-action {
+    display: flex !important; /* inline-flex se badalkar normal flex kiya layout alignment ke liye */
+    align-items: center !important;
+    gap: 12px !important;
+    height: 100% !important;
+}
+
+.card-content {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    height: 100% !important;
+}
+
+.item-name {
+    font-weight: 600 !important;
+    font-size: 14.5px !important; 
+    color: #1e293b !important;
+    letter-spacing: -0.1px !important;
+    text-transform: capitalize !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 180px !important; /* Text wrapping overflow security */
+    display: block !important;
+}
+
+.card-right-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    height: 100% !important;
+}
+
+.card-qty-controller button {
+    width: 32px !important;
+    height: 32px !important;
+    border: none !important;
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    border-radius: 10px !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.card-qty-controller input[type="number"] {
+    width: 34px !important;
+    font-size: 14.5px !important;
+    font-weight: 800 !important;
+    color: var(--primary) !important;
+    text-align: center !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+.card-add-btn {
+    width: 28px !important;  /* Height ke hisab se width choti ki */
+    height: 28px !important; /* Proper circular button bounds */
+    border-radius: 8px !important; /* Smooth sub-corners */
+    border: none !important;
+    background: #eff6ff !important; /* Very light subtle blue */
+    color: #3b82f6 !important; /* Professional blue */
+    font-size: 16px !important; /* Plus text balance size */
+    font-weight: 600 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease;
+    padding-bottom: 2px !important; /* Voice alignment tweak for plus symbol */
+}
+
+.card-add-btn:active {
+    transform: scale(0.9) !important;
+    background: rgba(37, 99, 235, 0.15) !important;
+}
+
+.card-cart-btn {
+    width: 32px !important;  /* Outer boundary compact ki */
+    height: 32px !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+    color: #64748b !important;
+    border: 1px solid #e2e8f0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-cart-btn svg {
+    width: 16px !important;  
+    height: 16px !important;
+    stroke-width: 2.2 !important; /* Lines thodi visible rakhi taaki chote me clear dikhe */
+}
+
+.card-cart-btn:active, .card-cart-btn.selected {
+    background: #eff6ff !important;
+    color: var(--primary) !important;
+    border-color: #bfdbfe !important;
+}
+
+.onboarding-card {
+    border-radius: 28px !important;
+    padding: 32px 24px !important;
+    background: #ffffff !important;
+    transform: scale(0.95);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.avatar-view {
+    font-size: 56px;
+    margin-bottom: 12px;
+    display: inline-block;
+    transition: transform 0.2s ease;
+    animation: waveHello 2.5s infinite ease-in-out;
+}
+
+@keyframes waveHello {
+    0%, 100% { transform: rotate(0deg); }
+    20% { transform: rotate(14deg); }
+    40% { transform: rotate(-4deg); }
+    60% { transform: rotate(10deg); }
+    80% { transform: rotate(0deg); }
+}
+
+.avatar-typing { animation: bounceCharacter 0.4s infinite alternate ease-in-out !important; }
+.avatar-success { animation: celebrateCharacter 0.5s 2 alternate cubic-bezier(0.175, 0.885, 0.32, 1.275) !important; font-size: 64px; }
+
+@keyframes bounceCharacter {
+    from { transform: translateY(0) scale(1); }
+    to { transform: translateY(-8px) scale(1.05); }
+}
+
+@keyframes celebrateCharacter {
+    0% { transform: scale(1) rotate(0); }
+    50% { transform: scale(1.2) rotate(15deg); }
+    100% { transform: scale(1) rotate(-15deg); }
+}
+
+.welcome-title {
+    font-size: 20px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    margin-bottom: 4px;
+}
+
+.welcome-subtitle {
+    font-size: 13px !important;
+    color: #64748b !important;
+    margin-bottom: 20px;
+    padding: 0 10px;
+}
+
+#user-name-input {
+    width: 100%;
+    height: 48px;
+    padding: 0 16px;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e293b;
+    outline: none;
+    text-align: center;
+    transition: all 0.25s ease;
+}
+
+#user-name-input:focus {
+    background: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.08);
+}
+
+.gateway-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(15, 23, 42, 0.9); /* Deep dark glass look */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: none; /* JS isko handle karega */
+    align-items: center;
+    justify-content: center;
+    z-index: 999999; /* Sabse upar dikhega */
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.gateway-overlay.active {
+    display: flex;
+    opacity: 1;
+}
+
+.gateway-card {
+    background: #ffffff;
+    width: 90%;
+    max-width: 360px;
+    padding: 35px 24px;
+    border-radius: 24px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.gateway-overlay.active .gateway-card {
+    transform: scale(1);
+}
+
+.gateway-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 6px;
+    margin-top: 10px;
+}
+
+.gateway-card p {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 24px;
+}
+
+.gateway-visuals {
+    width: 70px;
+    height: 70px;
+    margin: 0 auto 15px auto;
+    background: #f1f5f9;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.gateway-visuals .keyhole-icon {
+    width: 24px;
+    height: 24px;
+    border: 4px solid #2563eb;
+    border-radius: 50%;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.gateway-visuals .keyhole-icon::after {
+    content: '';
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 12px;
+    background: #2563eb;
+    border-radius: 2px;
+}
+
+.gateway-visuals.validating {
+    animation: portalPulse 1s infinite alternate;
+    background: #eff6ff;
+}
+
+.gateway-visuals.validating .keyhole-icon {
+    transform: scale(0.85);
+    border-color: #3b82f6;
+}
+
+.gateway-input-wrapper {
+    position: relative;
+    margin-bottom: 20px;
+    width: 100%;
+}
+
+.gateway-input-wrapper input {
+    width: 100%;
+    height: 50px;
+    padding: 0 16px;
+    background-color: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    color: #0f172a;
+    outline: none;
+    letter-spacing: 6px;
+    transition: all 0.2s ease;
+}
+
+.gateway-input-wrapper input:focus {
+    background-color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+}
+
+.gateway-card button {
+    width: 100%;
+    height: 48px;
+    background-color: #2563eb;
+    color: #ffffff;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    transition: all 0.15s ease;
+}
+
+.gateway-card button:active {
+    transform: scale(0.97);
+    background-color: #1d4ed8;
+}
+
+.gateway-overlay.success {
+    background-color: rgba(4, 120, 87, 0.95);
+}
+
+.gateway-overlay.success .gateway-card {
+    border-color: #10b981;
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
+}
+
+.gateway-overlay.success .gateway-visuals {
+    background: #ecfdf5;
+}
+
+.gateway-overlay.success .keyhole-icon {
+    border-color: #10b981;
+    transform: scale(1.1);
+}
+
+.gateway-overlay.success .keyhole-icon::after {
+    background: #10b981;
+}
+
+.gateway-overlay.failure {
+    background-color: rgba(153, 27, 27, 0.96); /* Dark Blood Red Layer */
+    animation: systemVibrate 0.4s ease-in-out;
+}
+
+.gateway-overlay.failure .gateway-card {
+    border-color: #ef4444;
+    background: #fff5f5;
+    animation: cardShake 0.4s ease-in-out;
+    box-shadow: 0 0 40px rgba(239, 68, 68, 0.5);
+}
+
+.gateway-overlay.failure .gateway-visuals {
+    background: #fee2e2;
+}
+.gateway-overlay.failure .keyhole-icon {
+    border-color: #ef4444;
+}
+.gateway-overlay.failure .keyhole-icon::after {
+    background: #ef4444;
+}
+
+.failure-hands {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.15));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+.gateway-overlay.failure .failure-hands {
+    opacity: 1;
+}
+
+@keyframes portalPulse {
+    from { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.2); }
+    to { box-shadow: 0 0 0 12px rgba(37, 99, 235, 0); }
+}
+
+@keyframes systemVibrate {
+    0%, 100% { transform: translate(0, 0); }
+    20%, 60% { transform: translate(-6px, 0); }
+    40%, 80% { transform: translate(6px, 0); }
+}
+
+@keyframes cardShake {
+    0%, 100% { transform: scale(1) translate(0, 0); }
+    25% { transform: scale(1.02) translate(-8px, 4px); }
+    50% { transform: scale(0.98) translate(8px, -4px); }
+    75% { transform: scale(1.01) translate(-4px, -2px); }
+}
+
+.accordion-step-wrapper {
+    background-color: #ffffff;
+    border: 1px solid var(--border-base);
+    border-radius: 14px;
+    padding: 14px 16px;
+    overflow: hidden;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.accordion-header-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    width: 100%;
+}
+
+.step-title-text {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--dark);
+    letter-spacing: -0.1px;
+}
+
+.compact-logout-link {
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--danger);
+    cursor: pointer;
+    padding: 4px 8px;
+    background-color: #fff1f2;
+    border-radius: 6px;
+    border: 1px solid #fecdd3;
+    transition: all 0.15s ease;
+}
+.compact-logout-link:active {
+    background-color: #ffe4e6;
+    transform: scale(0.94);
+}
+
+.accordion-arrow-icon {
+    font-size: 10px;
+    color: var(--text-sec);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.accordion-content-drawer {
+    max-height: 0; /* Initially strictly closed and locked */
+    opacity: 0;
+    visibility: hidden;
+    transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), 
+                opacity 0.22s ease, 
+                visibility 0.22s;
+    will-change: max-height, opacity;
+}
+
+.accordion-step-wrapper.step-open {
+    border-color: #bfdbfe;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.03);
+}
+
+.accordion-step-wrapper.step-open .accordion-content-drawer {
+    max-height: 200px; /* Expands smoothly according to data bounds */
+    opacity: 1;
+    visibility: visible;
+}
+
+.accordion-step-wrapper.step-open .accordion-arrow-icon {
+    transform: rotate(180deg);
+    color: var(--primary);
 }

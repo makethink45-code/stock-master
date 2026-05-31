@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f0f4f8">
+    <title>Admin Page</title>
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+<div id="mic-overlay" class="recording-overlay">
+    <div class="voice-wave-container">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+    </div>
+    <p class="listening-text">Listening...</p>
+</div>
+
+<div id="action-modal" class="modal-overlay" onclick="closeAllOverlays()">
+    <div class="modal-content bulk-modal" onclick="event.stopPropagation()">
+        <div class="modal-header" style="padding: 12px 12px 0px 12px;">
+            <h3 id="modal-title" style="padding: 0; margin: 0; font-size: 14px; color: var(--text-sec);">Add inside: Home</h3>
+        </div>
+        
+        <div id="bulk-smart-hint" style="display: none; width: 100%; padding: 8px 12px 4px 12px; display: flex; flex-wrap: wrap; gap: 6px; max-height: 75px; overflow-y: auto; text-align: left;">
+        </div>
+        
+        <div class="modal-body" style="padding-top: 8px;">
+            <textarea id="modal-input" placeholder="Lays, Bingo, Pringles" spellcheck="false"></textarea>
+            
+            <div class="modal-actions">
+                <button class="cancel-btn" onclick="closeAllOverlays()">Cancel</button>
+                <button id="modal-action-btn" class="modal-submit-btn" onclick="processBulkData()">Create Structure 🚀</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <div class="app-container">
+<header class="main-header">
+    <div class="app-name">Way Stock</div>
+    
+    <div class="header-actions">
+        <button class="icon-btn" aria-label="Search" id="search-btn">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </button>
+
+        <button class="icon-btn" aria-label="Cart" id="cart-btn">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+        </button>
+
+        <button class="icon-btn" aria-label="Menu" id="menu-btn">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+        </button>
+<div id="admin-menu" class="menu-dropdown">
+    <div class="menu-item">
+        <span class="menu-icon">➕</span>
+        <span>Add New Item</span>
+    </div>
+    <div class="menu-item">
+        <span class="menu-icon">⚙️</span>
+        <span>Setting</span>
+    </div>
+</div>
+    </div>
+</header>
+
+<div id="selection-toolbar" class="selection-toolbar-overlay" style="display: none;">
+    <div class="sel-count-group">
+        <button class="sel-btn btn-close" title="Cancel Selection" onclick="exitSelectionMode()">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        <span id="selection-counter-text">0 Selected</span>
+    </div>
+    <div class="sel-action-group" id="selection-buttons-container">
+        </div>
+</div>
+
+    
+        <main class="content-body">
+    <div class="action-bar">
+        
+<div id="breadcrumb-section" class="breadcrumb-container">
+    </div>
+
+<div id="search-section" class="search-container">
+    <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="main-search-input" placeholder="Search items..." autocomplete="off">
+        <button class="mic-btn" id="voice-search-btn">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+        </button>
+<div id="search-suggestion-chips" class="sober-search-dropdown"></div>
+    </div>
+    
+</div>
+
+
+
+    </div>
+
+<div class="main-content-area">
+
+    </div>
+
+</main>
+
+</div>
+<div id="cart-section" class="full-page-section">
+    <div class="cart-header">
+        <button class="icon-btn close-cart" onclick="window.history.back()">
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <h3>My Bucket</h3>
+    </div>
+
+    <div id="cart-content-area" class="cart-body">
+        <div class="empty-state">
+            <div class="empty-icon">🛒</div>
+            <h2>Bucket Khali Hai!</h2>
+            <p>Lagta hai aapne abhi tak kuch select nahi kiya. Chalo kuch naya dhundhte hain!</p>
+            <button class="fun-btn" onclick="window.history.back()">
+                Maal Bharo! 🚀
+            </button>
+        </div>
+    </div>
+
+    <div class="cart-footer" style="display: none;">
+    <div class="total-info">
+        <span>Total Items: <b id="cart-count">0</b></span>
+    </div>
+    <button class="checkout-btn" onclick="generateCartPreview()">Preview Order 🚀</button>
+</div>
+</div>
+<div id="setting-section" class="full-page-section">
+    <div class="setting-header">
+        <button class="icon-btn" onclick="window.history.back()">
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <h3>Settings</h3>
+    </div>
+<div class="setting-body" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+
+    <div class="accordion-step-wrapper">
+        <div class="accordion-header-trigger" onclick="toggleSettingsStep('security-step-content', this)">
+            <span class="step-title-text">🔐 Security Settings</span>
+            <div style="display: flex; align-items: center; gap: 12px;" onclick="event.stopPropagation()">
+                <span onclick="logoutAdminSession()" class="compact-logout-link">Logout</span>
+                <span class="accordion-arrow-icon">▼</span>
+            </div>
+        </div>
+        
+        <div id="security-step-content" class="accordion-content-drawer">
+            <div class="drawer-inner-padding" style="display: flex; flex-direction: column; gap: 10px; padding-top: 12px;">
+                <input type="password" id="admin-old-password" placeholder="Enter Current (Old) Password" style="width: 100%; height: 40px; padding: 0 12px; background: #f1f5f9; border: 2px solid transparent; border-radius: 10px; font-size: 13px; outline: none; font-family: sans-serif;">
+                <input type="password" id="admin-new-password" placeholder="Enter New Password" style="width: 100%; height: 40px; padding: 0 12px; background: #f1f5f9; border: 2px solid transparent; border-radius: 10px; font-size: 13px; outline: none; font-family: sans-serif;">
+                <button onclick="updateCloudAdminPassword()" style="width: 100%; height: 40px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 13px; margin-top: 4px; cursor: pointer;">
+                    Update Master Password ⚡
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="accordion-step-wrapper">
+        <div class="accordion-header-trigger" onclick="toggleSettingsStep('broadcast-step-content', this)">
+            <span class="step-title-text">📢 Broadcast Notification</span>
+            <span class="accordion-arrow-icon">▼</span>
+        </div>
+        
+        <div id="broadcast-step-content" class="accordion-content-drawer">
+            <div class="drawer-inner-padding" style="padding-top: 12px;">
+                <textarea id="admin-broadcast-input" placeholder="User ko kya message bhejna he..." spellcheck="false" style="width: 100%; height: 80px; padding: 12px; background: #f1f5f9; border: 2px solid transparent; border-radius: 12px; font-size: 13px; outline: none; resize: none; font-family: sans-serif;"></textarea>
+                <button onclick="sendGlobalBroadcastNotification()" style="width: 100%; height: 40px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 13px; margin-top: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);">
+                    Send Message 🚀
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>
+<div id="preview-section" class="full-page-section">
+    <div class="setting-header">
+        <button class="icon-btn" onclick="window.history.back()">
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <h3>Order Images</h3>
+    </div>
+    <div id="preview-content-area" class="cart-body" style="justify-content: flex-start; overflow-y: auto; padding: 16px 0;">
+        </div>
+</div>
+
+<div id="custom-alert-container" class="alert-container"></div>
+
+<script src="common.js"></script>
+<script src="admin-script.js"></script>
+</body>
+</html>
