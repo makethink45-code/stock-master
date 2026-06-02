@@ -3,14 +3,16 @@ const CACHE_NAME = 'waystock-cache-v1';
 
 // 📦 1. UNHINDRANCES STATIC CORE FILES: Yeh saari files mobile local memory me dump (save) ho jayengi
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/admin.html',
-  '/style.css',
-  '/common.js',
-  '/user-script.js',
-  '/admin-script.js',
-  '/manifest.json'
+  './',
+  './index.html',
+  './admin.html',
+  './style.css',
+  './common.js',
+  './user-script.js',
+  './admin-script.js',
+  './manifest.json',
+  './logo.png',
+  './notification-sound.wav'
 ];
 
 // Service Worker Install State Execution
@@ -41,8 +43,6 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// 🔑 2. TRUE OFFLINE CORE FETCH ENGINE: Network First, Fallback to Cache Strategy
-// Isse data hamesha fresh live load hoga, par net band hone par local cache se app turant chalu ho jayegi!
 self.addEventListener('fetch', (e) => {
   e.respondWith(
     fetch(e.request).then((response) => {
@@ -61,33 +61,39 @@ self.addEventListener('fetch', (e) => {
   );
 });
 
-// ==========================================================================
-// --- 📢 PUSH NOTIFICATION RECEIVER LOGIC SYSTEM ---
-// ==========================================================================
-
-// 🔑 FIX: Jab cloud database message trigger karega, tab mobile display board handle hoga
+// 🟢 Service Worker Push Receiver Channel
 self.addEventListener('push', function(event) {
-    let payloadText = 'Fresh update received inside database dashboard.';
+    let payload = {
+        title: 'WayStock System Master 🚀',
+        body: 'Naya stock update hua hai!',
+        sound: './notification-sound.wav' // 🔑 HARDWARE STREAM INTEGRATION
+    };
+
     if (event.data) {
-        payloadText = event.data.text();
+        try {
+            payload = event.data.json();
+        } catch (e) {
+            payload.body = event.data.text();
+        }
     }
 
     const options = {
-        body: payloadText,
-        icon: '/logo.png', // Aapka local icon image asset link
+        body: payload.body,
+        icon: '/logo.png',
         badge: '/logo.png',
-        vibrate: [200, 100, 200],
-        tag: 'waystock-broadcast',
+        vibrate: [100, 50, 100, 200],
+        tag: payload.tag || 'waystock-push',
         renotify: true,
-        data: { url: '/' }
+        
+        // 🚀 CRITICAL CONFIG: Phone system ko background custom sound instruction inject karna
+        sound: payload.sound || './notification-sound.wav'
     };
 
     event.waitUntil(
-        self.registration.showNotification('WayStock Hub Update 📢', options)
+        self.registration.showNotification(payload.title, options)
     );
 });
 
-// Action routing configuration inside user workspace window layout
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
     event.waitUntil(

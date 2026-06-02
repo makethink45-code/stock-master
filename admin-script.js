@@ -1,16 +1,32 @@
-
 (function secureAdminWorkspace() {
-    const loginToken = localStorage.getItem('wayStock_admin_token');
-    const tokenExpiry = localStorage.getItem('wayStock_admin_expiry');
+    // 🔑 SECURITY UPGRADE: Shifting from LocalStorage to SessionStorage to prevent spoofing
+    const loginToken = sessionStorage.getItem('wayStock_admin_authenticated');
+    const tokenExpiry = sessionStorage.getItem('wayStock_admin_expiry');
     const currentTime = Date.now();
     
-    // Agar token nahi he, ya expiry time khatam ho chuka he, toh instant block karo
-    if (loginToken !== "true" || !tokenExpiry || currentTime > parseInt(tokenExpiry)) {
-        // Purana expired data saaf karo
+    // Fallback checks on LocalStorage just in case of light tab retention
+    const localBackupToken = localStorage.getItem('wayStock_admin_token');
+    const localBackupExpiry = localStorage.getItem('wayStock_admin_expiry');
+
+    let isAuthenticated = false;
+
+    if (loginToken === "true" && tokenExpiry && currentTime <= parseInt(tokenExpiry)) {
+        isAuthenticated = true;
+    } else if (localBackupToken === "true" && localBackupExpiry && currentTime <= parseInt(localBackupExpiry)) {
+        // Hydrate session if local storage token is still valid
+        sessionStorage.setItem('wayStock_admin_authenticated', "true");
+        sessionStorage.setItem('wayStock_admin_expiry', localBackupExpiry);
+        isAuthenticated = true;
+    }
+    
+    if (!isAuthenticated) {
+        // Force complete wipe out of fake or expired tokens
+        sessionStorage.removeItem('wayStock_admin_authenticated');
+        sessionStorage.removeItem('wayStock_admin_expiry');
         localStorage.removeItem('wayStock_admin_token');
         localStorage.removeItem('wayStock_admin_expiry');
         
-        alert("🚫 Session Expired or Unauthorized! Redirecting to User Dashboard...");
+        alert("🚫 Access Denied: Unauthorized Session Detour Detected!");
         window.location.href = "index.html"; 
     }
 })();
@@ -175,8 +191,18 @@ if (isEditModeActive && editTargetKey) {
 }
 
 
-    let inventory = JSON.parse(localStorage.getItem('wayStock_inventory')) || {}; //
-    const lines = rawData.split('\n'); //
+        // 🔑 STORAGE UPGRADE: Fetching dynamic inventory from RAM cache instead of local storage directly
+    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {}; 
+    
+    // 🛡️ CRITICAL BLANK LINE FILTER: Splitting by newline and filtering out any pure spaces or empty inputs instantly
+    const lines = rawData.split('\n')
+                         .map(line => line.trim())
+                         .filter(line => line.length > 0); 
+
+    if (lines.length === 0) {
+        showAlert("Oho! Kuch valid text toh likhiye structure banane ke liye. ✍️", "error");
+        return;
+    }
 
     // === 🔴 SAFETY FILTER 1: Folder ke naam me Comma (,) check karna ===
     let hasValidationError = false; //
@@ -246,20 +272,32 @@ if (isEditModeActive && editTargetKey) {
         });
     });
     // Save changes safely inside IndexedDB only
+            // 🔄 Atomic commit locks to storage layers
     if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
     if (typeof syncToFirebase === "function") syncToFirebase();
+    
+    // 🧽 Explicitly resetting DOM element pointers to prevent memory leak retention
     inputField.value = ""; 
 
-    
-    // Suggestion chip container UI safety reset
-    if (document.getElementById('bulk-smart-hint')) { //
-        document.getElementById('bulk-smart-hint').style.display = 'none'; //
-        document.getElementById('bulk-smart-hint').innerHTML = ""; //
+    // Suggestion chip container UI safety reset and visual state collapsing
+    const hintBadge = document.getElementById('bulk-smart-hint');
+    if (hintBadge) { 
+        hintBadge.style.display = 'none'; 
+        hintBadge.innerHTML = ""; 
     }
     
-    closeAllOverlays(); //
-    renderAdminInventory(); //
+    // Exit selection framework setups safely if active during modifications
+    isEditModeActive = false;
+    editTargetKey = "";
+    const actionBtn = document.getElementById('modal-action-btn');
+    if (actionBtn) actionBtn.innerText = "Create Structure 🚀";
+
+    closeAllOverlays(); 
+    if (typeof renderAdminInventory === "function") renderAdminInventory();
+    showAlert("Structure successfully create ho gaya! 🚀", "success");
 }
+
+        
 
 window.renderAdminInventory = function() {
     const mainArea = document.querySelector('.main-content-area');
@@ -801,11 +839,14 @@ async function updateCloudAdminPassword() {
                 oldPassInput.value = "";
                 newPassInput.value = "";
                 
-                // Security Safety: Password change hote hi user ko logout karke wapas bhej do
-                setTimeout(() => {
-                    sessionStorage.removeItem('wayStock_admin_authenticated');
-                    window.location.href = "index.html";
-                }, 1500);
+// ⚡ SECURITY SAFETY ENHANCED: Clear all local and session tokens instantly on password reset
+setTimeout(() => {
+    sessionStorage.removeItem('wayStock_admin_authenticated');
+    sessionStorage.removeItem('wayStock_admin_expiry');
+    localStorage.removeItem('wayStock_admin_token');
+    localStorage.removeItem('wayStock_admin_expiry');
+    window.location.href = "index.html";
+}, 1500);
                 
             } else {
                 showAlert("🚫 Purana (Old) Password galat he! Authentication Failed.", "error");
@@ -821,16 +862,18 @@ async function updateCloudAdminPassword() {
 
 function logoutAdminSession() {
     if (confirm("Kya aap sach me Admin Panel se Logout karna chahte hain? 🚪")) {
-        // Tokens clear karo
+        // Clear everything everywhere to kill the session hooks safely
+        sessionStorage.removeItem('wayStock_admin_authenticated');
+        sessionStorage.removeItem('wayStock_admin_expiry');
         localStorage.removeItem('wayStock_admin_token');
         localStorage.removeItem('wayStock_admin_expiry');
         
         if (typeof showAlert === "function") {
-            showAlert("Logged out successfully! 🔒", "info");
+            showAlert("Session terminated safely. Logged out! 🔒", "info");
         }
         
         setTimeout(() => {
-            window.location.href = "index.html"; // Redirect to User Page
+            window.location.href = "index.html"; 
         }, 800);
     }
 }

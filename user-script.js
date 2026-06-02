@@ -1,3 +1,18 @@
+// 🔄 LIVE ROUTER REFRESH ENGINE: Admin panel se user page par wapas aate hi automatic load trigger
+window.onpageshow = function(event) {
+    // persisted check detect karta he ki kya page cache (back button memory) se open huva he
+    if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+        console.log("🔄 [Router Engine] Returned from Admin Panel. Forced layout synchronization active...");
+        
+        // Central components ko live runtime data context pool se instantly re-render karo
+        if (typeof initializeAppFlow === "function") {
+            initializeAppFlow(); 
+        } else {
+            // Safety backup fallback layer trigger if initialization stream collapses
+            window.location.reload(); 
+        }
+    }
+};
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -36,14 +51,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (onboardingModal) onboardingModal.style.display = 'none';
         initializeAppFlow(); // Direct application flow triggers for registered users
     }
-    // ==========================================================================
+// ==========================================================================
 // --- 📱 SYSTEM PUSH NOTIFICATION REGISTRATION (user-script.js) ---
 // ==========================================================================
 if ('serviceWorker' in navigator && 'PushManager' in window) {
-    // 1. Service Worker register karo jo app band hone par bhi piche zinda rahega
-    navigator.serviceWorker.register('service-worker.js')
+    // 🔑 SCOPE PATH FIX: Using absolute root path prefix '/' to avoid nested directory registration breakdowns
+    navigator.serviceWorker.register('/service-worker.js')
     .then(reg => {
-        console.log('🤖 Service Worker Registered Successfully!', reg);
+        console.log('🤖 Service Worker Registered Successfully with absolute root scope!', reg);
         
         // 2. System Notification ki permission mango
         if (Notification.permission === 'default') {

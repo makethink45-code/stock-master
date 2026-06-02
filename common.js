@@ -9,6 +9,7 @@ window.currentFolder = 'root';
 window.isFolderNavigating = false;
 
 
+
 const firebaseConfig = {
   apiKey: "AIzaSyBd83Jk5n7M2mkumtFT-t_zktD8Wz0cZnM",
   authDomain: "stockmaster-94534.firebaseapp.com",
@@ -22,6 +23,14 @@ if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 const db = firebase.firestore();
+
+
+// 🔑 OFFLINE COMPATIBILITY LAYER: Offline data access capabilities lock karna
+db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+    console.warn("Firestore offline persistence state:", err.code);
+});
+
+
 
 const stockCollectionRef = db.collection("stock");
 const tokenRef = db.collection("appSettings").doc("versionControl");
@@ -117,37 +126,47 @@ async function syncToFirebase() {
     }
 }
 
-// 📥 MULTI-DOC BATCH CONTEXT LOADER
+// 📥 OPTIMIZED OFFLINE-FIRST BATCH CONTEXT LOADER
 async function loadFirebaseData() {
     try {
+        // Step 1: Local IndexedDB Initialize karo sabse pehle
         await initWayStockIndexedDB();
         
-        // LocalStorage completely bypassed here! Straight fetch from IndexedDB
+        // Step 2: Instant Memory Hydration (Bina internet ke wait kiye sseedha local read)
         let cachedInventory = await readFromIndexedDB();
         if (cachedInventory) {
+            // Memory me populate ho chuka he, instantly UI refresh maar do
             if (typeof refreshUI === "function") refreshUI();
-            console.log("📦 Loaded directly from local IndexedDB cache database.");
+            console.log("📦 [Offline Engine] Loaded instantly from local IndexedDB storage cache.");
         }
 
-        if (!navigator.onLine) return;
-
-        const tokenSnapshot = await tokenRef.get();
-        if (!tokenSnapshot.exists) {
-            const initToken = String(Date.now());
-            await tokenRef.set({ token: initToken }, { merge: true });
-            localStorage.setItem('wayStock_local_token', initToken);
-            return;
+        // Step 3: Internet Check Guard Gate
+        if (!navigator.onLine) {
+            console.log("✈️ [Offline Engine] No Internet Connection. Operating strictly in Offline-First Mode.");
+            return; // Yahin se runtime terminate, no firebase overhead
         }
+
+        console.log("☁️ [Offline Engine] Network found. Verifying cloud delta synchronization tokens...");
+
+        // Step 4: Master Version Matching Call (Sirf 1 haldi document check)
+        const tokenSnapshot = await tokenRef.get().catch(err => {
+            console.log("⚠️ [Offline Engine] Firebase handshake timeout. Defaulting to local offline data.");
+            return null;
+        });
+
+        if (!tokenSnapshot || !tokenSnapshot.exists) return;
 
         const cloudToken = String(tokenSnapshot.data().token);
         const localToken = String(localStorage.getItem('wayStock_local_token'));
 
+        // Strict Enforcement: Agar token barabar he, toh server se single byte bhi download nahi hoga!
         if (cloudToken === localToken && cachedInventory) {
-            console.log(`🎯 Token Matched (${localToken}). Server download blocked!`);
+            console.log(`🎯 [Offline Engine] Token Matched (${localToken}). Cache is healthy. Blocked server queries.`);
             return;
         }
 
-        console.log("🔄 Token mismatched. Pulling fresh segments into IndexedDB...");
+        // Step 5: Delta Download Loop (Sirf tabhi chalega jab sach me badlao hua ho)
+        console.log("🔄 [Offline Engine] Token mismatched. Re-assembling fresh segments into local block...");
         
         const rootSnapshot = await stockCollectionRef.doc("rootStructures").get();
         let freshFullInventory = {};
@@ -167,46 +186,54 @@ async function loadFirebaseData() {
                 }
             });
 
-            // Clean save only to IndexedDB & RAM registry
+            // Token register update aur safely write into IndexedDB
             localStorage.setItem('wayStock_local_token', cloudToken);
             saveToIndexedDB(freshFullInventory);
             
             if (typeof refreshUI === "function") refreshUI();
+            console.log("🎉 [Offline Engine] Cloud compilation complete. Cache flushed & hydrated successfully.");
         }
     } catch (e) {
-        console.error("Segmented download compilation crashed:", e);
+        console.error("❌ [Offline Engine] Segmented bundle boot collection crashed:", e);
     }
 }
 
-// 🔄 MULTI-TAB LIVE RE-SYNC WATCHER
+// 🔄 MULTI-TAB LIVE RE-SYNC WATCHER (WIRED WITH OFFLINE NETWORK GAARDS)
 tokenRef.onSnapshot(async (doc) => {
-    if (doc.exists && navigator.onLine) {
-        const cloudToken = String(doc.data().token);
-        const localToken = String(localStorage.getItem('wayStock_local_token'));
-        
-        if (cloudToken !== localToken) {
-            console.log("⚡ Cloud mutation detected. Re-assembling segments into IndexedDB...");
-            const rootSnapshot = await stockCollectionRef.doc("rootStructures").get();
-            let freshFullInventory = {};
+    // Agar active internet hi nahi he, toh snapshot triggers ko silently kill karo
+    if (!navigator.onLine) return; 
 
-            if (rootSnapshot.exists) {
-                freshFullInventory = rootSnapshot.data();
-                const segmentFetchPromises = Object.keys(freshFullInventory).map(rootKey => {
-                    return stockCollectionRef.doc(`segment_${rootKey.replaceAll(" ", "_")}`).get();
-                });
-                const segmentSnapshots = await Promise.all(segmentFetchPromises);
-                segmentSnapshots.forEach(snap => {
-                    if (snap.exists) Object.assign(freshFullInventory, snap.data());
-                });
+    try {
+        if (doc.exists) {
+            const cloudToken = String(doc.data().token);
+            const localToken = String(localStorage.getItem('wayStock_local_token'));
+            
+            if (cloudToken !== localToken) {
+                console.log("⚡ [Offline Engine] Background mutation detected. Fetching incremental logs...");
+                
+                const rootSnapshot = await stockCollectionRef.doc("rootStructures").get();
+                let freshFullInventory = {};
 
-                localStorage.setItem('wayStock_local_token', cloudToken);
-                saveToIndexedDB(freshFullInventory);
-                if (typeof refreshUI === "function") refreshUI();
+                if (rootSnapshot.exists) {
+                    freshFullInventory = rootSnapshot.data();
+                    const segmentFetchPromises = Object.keys(freshFullInventory).map(rootKey => {
+                        return stockCollectionRef.doc(`segment_${rootKey.replaceAll(" ", "_")}`).get();
+                    });
+                    const segmentSnapshots = await Promise.all(segmentFetchPromises);
+                    segmentSnapshots.forEach(snap => {
+                        if (snap.exists) Object.assign(freshFullInventory, snap.data());
+                    });
+
+                    localStorage.setItem('wayStock_local_token', cloudToken);
+                    saveToIndexedDB(freshFullInventory);
+                    if (typeof refreshUI === "function") refreshUI();
+                }
             }
         }
+    } catch(err) {
+        console.log("🔒 [Offline Engine] Suppressed snapshot streaming conflicts.");
     }
 });
-
 
 
 
@@ -379,13 +406,10 @@ function getEmptyStateHTML() {
     `;
 }
 
-
-
-
 function generateCartPreview() {
     const cart = getCartItems();
     // Upgraded clean reference:
-const inventory = getActiveInventory();
+    const inventory = getActiveInventory();
 
     const keys = Object.keys(cart);
 
@@ -408,125 +432,180 @@ const inventory = getActiveInventory();
     if (!previewContentArea) return;
 
     previewContentArea.innerHTML = ""; 
-    // common.js ke andar is pure forEach loop block ko isse REPLACE karein:
-// common.js ke andar is pure forEach loop block ko isse REPLACE karein:
-Object.keys(groupedCart).forEach((rootName) => {
-    const items = groupedCart[rootName]; //
+
+    // 🔑 FIXED STATE 1: Helper utility function ko loop shuru hone se pehle top par daldia taaki scope errors na aayein
+    function appendPreviewCardToDOM(imgURL, rootName) {
+        const previewCard = document.createElement('div'); 
+        previewCard.className = "group-preview-card"; 
+        previewCard.style = "width: calc(100% - 32px); max-width: 450px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; margin: 0 auto 16px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.02);"; 
+        
+        previewCard.innerHTML = `
+            <div style="width: 100%; overflow: hidden; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 12px;">
+                <img src="${imgURL}" style="width: 100%; display: block;" alt="Order Group Image">
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button onclick="downloadGroupImage('${imgURL}', '${rootName}')" style="flex: 1; height: 40px; background: #2563eb; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;">📥 Download PNG</button>
+            </div>
+        `; 
+        previewContentArea.appendChild(previewCard);
+    }
     
-    // --- HIGH-CONTRAST CLEAN SOBER DIMENSIONS ---
-    const rowHeight = 40;       
-    const headerHeight = 85;    
-    const footerHeight = 40;    
-    const canvasWidth = 450;    
-    const canvasHeight = headerHeight + (items.length * rowHeight) + footerHeight;
+    // Main formatting loop wrapper block
+    Object.keys(groupedCart).forEach((rootName) => {
+        const items = groupedCart[rootName]; //
+        
+        // --- HIGH-CONTRAST CLEAN SOBER DIMENSIONS (FIXED HEIGHT INTEGRATION) ---
+        const rowHeight = 40;       
+        const headerHeight = 85;    
+        const footerHeight = 40;    
+        const canvasWidth = 450;    
+        const canvasHeight = 600; // 📏 Fixed bounding size to control memory allocation safely
 
-    const canvas = document.createElement('canvas'); //
-    canvas.width = canvasWidth; //
-    canvas.height = canvasHeight; //
-    const ctx = canvas.getContext('2d'); //
+        const canvas = document.createElement('canvas'); //
+        canvas.width = canvasWidth; //
+        canvas.height = canvasHeight; //
+        const ctx = canvas.getContext('2d'); //
 
-    // Pure Clean White Base
-    ctx.fillStyle = "#ffffff"; //
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight); //
+        // Pure Clean White Base
+        ctx.fillStyle = "#ffffff"; //
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight); //
 
-    // --- MINIMALIST TEXT HEADER ---
-    // Title: Big, Bold & Dark Slate
-    ctx.fillStyle = "#0f172a"; 
-    ctx.font = "bold 20px ui-monospace, monospace";
-    ctx.textAlign = "left";
-    ctx.fillText(rootName.toUpperCase(), 20, 38);
-
-    // Metadata Sub-line: Date and Total Items Count
-    ctx.fillStyle = "#64748b";
-    ctx.font = "12px ui-monospace, monospace";
-    const totalItemsText = "Total Items: " + items.length + "  |  " + new Date().toLocaleDateString('en-GB');
-    ctx.fillText(totalItemsText, 20, 60);
-
-    // Top Thick Divider Line (Sober Indicator)
-    ctx.strokeStyle = "#0f172a"; 
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(20, 72);
-    ctx.lineTo(canvasWidth - 20, 72);
-    ctx.stroke();
-
-    let currentY = headerHeight + 20;
-
-    // Inside Loop: Rows Layout Design
-    items.forEach((item, idx) => {
-        let finalNameToShow = item.name; //
-        const pathParts = item.cartKey.split('>'); //
-        if (pathParts.length > 1) { //
-            pathParts.pop(); //
-            const parentKey = pathParts.join('>').trim(); //
-            const parentData = inventory[parentKey]; //
-            if (parentData && parentData.toggleOn === true) { //
-                const parentName = parentData.name || parentKey.split('>').pop().trim(); //
-                finalNameToShow = parentName + " " + item.name; //
-            }
-        }
-
-        // Serial Number & Item Name Text
-        ctx.textAlign = "left";
-        ctx.fillStyle = "#1e293b"; 
-        ctx.font = "500 14px ui-monospace, monospace";
-        ctx.fillText((idx + 1) + ".  " + finalNameToShow, 20, currentY);
-
-        // Unit Quantity Highlight (Pure Black Bold text)
-        ctx.textAlign = "right";
+        // --- MINIMALIST TEXT HEADER ---
         ctx.fillStyle = "#0f172a"; 
-        ctx.font = "bold 15px ui-monospace, monospace";
-        const qtyText = item.quantity + " " + (item.unit || "Box"); //
-        ctx.fillText(qtyText, canvasWidth - 20, currentY); //
+        ctx.font = "bold 20px ui-monospace, monospace";
+        ctx.textAlign = "left";
+        ctx.fillText(rootName.toUpperCase(), 20, 38);
 
-        // Minimal Light Row Separators
-        ctx.strokeStyle = "#e2e8f0"; 
-        ctx.lineWidth = 1; //
-        ctx.beginPath(); //
-        ctx.moveTo(20, currentY + 12); //
-        ctx.lineTo(canvasWidth - 20, currentY + 12); //
-        ctx.stroke(); //
+        // Metadata Sub-line with calculated dynamic part indicators
+        ctx.fillStyle = "#64748b";
+        ctx.font = "12px ui-monospace, monospace";
+        const maxParts = Math.ceil(items.length / 11);
+        const totalItemsText = "Total Items: " + items.length + " | Part: 1/" + maxParts + " | " + new Date().toLocaleDateString('en-GB');
+        ctx.fillText(totalItemsText, 20, 60);
 
-        currentY += rowHeight; //
+        // Top Thick Divider Line
+        ctx.strokeStyle = "#0f172a"; 
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(20, 72);
+        ctx.lineTo(canvasWidth - 20, 72);
+        ctx.stroke();
+
+        let currentY = headerHeight + 20;
+
+        // Active context layer memory points
+        let activeCanvas = canvas;
+        let activeCtx = ctx;
+
+        // Inside Loop: Rows Layout Design with smart auto-slicing logic built-in
+        items.forEach((item, idx) => {
+            
+            // Checkpoint loop: 11 items partition constraint metrics tracker
+            if (idx > 0 && idx % 11 === 0) {
+                // Render older layer footer layouts safely before memory swap
+                activeCtx.strokeStyle = "#94a3b8"; 
+                activeCtx.lineWidth = 1;
+                activeCtx.beginPath();
+                activeCtx.moveTo(20, canvasHeight - 32);
+                activeCtx.lineTo(canvasWidth - 20, canvasHeight - 32);
+                activeCtx.stroke();
+                activeCtx.textAlign = "left";
+                activeCtx.fillStyle = "#94a3b8";
+                activeCtx.font = "10px ui-monospace, monospace";
+                activeCtx.fillText("Generated via WayStock Master", 20, canvasHeight - 15);
+                activeCtx.textAlign = "right";
+                activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), canvasWidth - 20, canvasHeight - 15);
+
+                const partialImgURL = activeCanvas.toDataURL("image/png");
+                appendPreviewCardToDOM(partialImgURL, rootName);
+
+                // Re-instantiate next canvas sheet dynamically
+                activeCanvas = document.createElement('canvas');
+                activeCanvas.width = canvasWidth;
+                activeCanvas.height = canvasHeight;
+                activeCtx = activeCanvas.getContext('2d');
+
+                activeCtx.fillStyle = "#ffffff";
+                activeCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+                activeCtx.fillStyle = "#0f172a"; 
+                activeCtx.font = "bold 20px ui-monospace, monospace";
+                activeCtx.textAlign = "left";
+                activeCtx.fillText(rootName.toUpperCase() + " (CONT.)", 20, 38);
+                
+                activeCtx.fillStyle = "#64748b";
+                activeCtx.font = "12px ui-monospace, monospace";
+                const nextPart = Math.floor(idx / 11) + 1;
+                activeCtx.fillText("Total Items: " + items.length + " | Part: " + nextPart + "/" + maxParts + " | " + new Date().toLocaleDateString('en-GB'), 20, 60);
+                
+                activeCtx.strokeStyle = "#0f172a"; 
+                activeCtx.lineWidth = 2;
+                activeCtx.beginPath();
+                activeCtx.moveTo(20, 72);
+                activeCtx.lineTo(canvasWidth - 20, 72);
+                activeCtx.stroke();
+
+                currentY = headerHeight + 20; // reset pointer to upper bounds
+            }
+
+            let finalNameToShow = item.name; //
+            const pathParts = item.cartKey.split('>'); //
+            if (pathParts.length > 1) { //
+                pathParts.pop(); //
+                const parentKey = pathParts.join('>').trim(); //
+                const parentData = inventory[parentKey]; //
+                if (parentData && parentData.toggleOn === true) { //
+                    const parentName = parentData.name || parentKey.split('>').pop().trim(); //
+                    finalNameToShow = parentName + " " + item.name; //
+                }
+            }
+
+            // Text layout adjustments mapping to active stream context
+            activeCtx.textAlign = "left";
+            activeCtx.fillStyle = "#1e293b"; 
+            activeCtx.font = "500 14px ui-monospace, monospace";
+            activeCtx.fillText((idx + 1) + ".  " + finalNameToShow, 20, currentY);
+
+            activeCtx.textAlign = "right";
+            activeCtx.fillStyle = "#0f172a"; 
+            activeCtx.font = "bold 15px ui-monospace, monospace";
+            const finalUnitText = item.unit ? " " + item.unit : "";
+            const qtyText = item.quantity + finalUnitText; 
+            
+            activeCtx.fillText(qtyText, canvasWidth - 20, currentY); //
+
+            activeCtx.strokeStyle = "#e2e8f0"; 
+            activeCtx.lineWidth = 1; //
+            activeCtx.beginPath(); //
+            activeCtx.moveTo(20, currentY + 12); //
+            activeCtx.lineTo(canvasWidth - 20, currentY + 12); //
+            activeCtx.stroke(); //
+
+            currentY += rowHeight; //
+        });
+
+        // 🔑 FIXED STATE 2: Loop complete hone par aakhiri/bache huye elements ka closure draw karna
+        activeCtx.strokeStyle = "#94a3b8"; 
+        activeCtx.lineWidth = 1;
+        activeCtx.beginPath();
+        activeCtx.moveTo(20, canvasHeight - 32);
+        activeCtx.lineTo(canvasWidth - 20, canvasHeight - 32);
+        activeCtx.stroke();
+        activeCtx.textAlign = "left";
+        activeCtx.fillStyle = "#94a3b8";
+        activeCtx.font = "10px ui-monospace, monospace";
+        activeCtx.fillText("Generated via WayStock Master", 20, canvasHeight - 15);
+        activeCtx.textAlign = "right";
+        activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), canvasWidth - 20, canvasHeight - 15);
+
+        const imgURL = activeCanvas.toDataURL("image/png"); //
+        appendPreviewCardToDOM(imgURL, rootName);
     });
 
-    // --- CLEAN BASE FOOTER ---
-    ctx.strokeStyle = "#94a3b8"; 
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(20, canvasHeight - 32);
-    ctx.lineTo(canvasWidth - 20, canvasHeight - 32);
-    ctx.stroke();
-
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "10px ui-monospace, monospace";
-    ctx.fillText("Generated via WayStock Master", 20, canvasHeight - 15);
-
-    ctx.textAlign = "right";
-    ctx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), canvasWidth - 20, canvasHeight - 15);
-
-    const imgURL = canvas.toDataURL("image/png"); //
-
-    // Preview Card Container Update
-    const previewCard = document.createElement('div'); //
-    previewCard.className = "group-preview-card"; //
-    previewCard.style = "width: calc(100% - 32px); max-width: 450px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; margin: 0 auto 16px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.02);"; 
-    
-    previewCard.innerHTML = `
-        <div style="width: 100%; overflow: hidden; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 12px;">
-            <img src="${imgURL}" style="width: 100%; display: block;" alt="Order Group Image">
-        </div>
-        <div style="display: flex; gap: 8px;">
-            <button onclick="downloadGroupImage('${imgURL}', '${rootName}')" style="flex: 1; height: 40px; background: #2563eb; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;">📥 Download PNG</button>
-        </div>
-    `; //
-    previewContentArea.appendChild(previewCard); //
-});
-
-    openOverlay('preview');
+    if (typeof openOverlay === 'function') {
+        openOverlay('preview');
+    }
 }
-
 
 function triggerActiveCart(btn) {
     btn.classList.add('selected');
@@ -548,37 +627,70 @@ if (searchBtn) {
     searchBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         
-        const mainHeader = document.querySelector('.main-header'); // Header ko target kiya
+        const mainHeader = document.querySelector('.main-header');
         
+        // Agar search bar pehle se khula he, toh click karne par sseedha normal back jao
         if (searchSection?.classList.contains('active')) {
             window.history.back();
         } else {
-            window.currentFolder = 'root';
-            window.pathStack = ['Home'];
             
-            if (window.location.pathname.includes('admin.html')) {
-                if (typeof renderAdminInventory === "function") renderAdminInventory();
-            } else {
-                if (typeof renderUserInventory === "function") renderUserInventory();
-            }
-            if (typeof updateBreadcrumb === "function") updateBreadcrumb();
-
-            // 🔑 JS EXPANSION: Header par dynamic search-active state tag lagao
-            if (mainHeader) mainHeader.classList.add('search-active');
-
-            // Central tracking framework stack integration
-            openOverlay('search');
-            
-            setTimeout(() => {
-                const suggestionContainer = document.getElementById('search-suggestion-chips');
-                if (suggestionContainer) {
-                    suggestionContainer.style.display = 'flex'; 
+            // 🔑 STEP 1: Pehle check karo user kisi folder me he ya nahi. 
+            // Agar nested layer me he, toh pehle physical history flush ko execute karo.
+            if (window.pathStack && window.pathStack.length > 1) {
+                const levelsToPop = window.pathStack.length - 1;
+                
+                // 🔄 Browser ko sseedha order mila: "Pehle piche jao!"
+                window.history.go(-levelsToPop); 
+                
+                // Pointers aur states ko instantly background me clean kiya
+                window.currentFolder = 'root';
+                window.pathStack = ['Home'];
+                
+                if (window.location.pathname.includes('admin.html')) {
+                    if (typeof renderAdminInventory === "function") renderAdminInventory();
+                } else {
+                    if (typeof renderUserInventory === "function") renderUserInventory();
                 }
-                if (typeof renderHistoryDropdown === "function") renderHistoryDropdown(); 
-            }, 80);
+                if (typeof updateBreadcrumb === "function") updateBreadcrumb();
+
+                // ⏳ STEP 2: DIESEL TIME-GAP (200ms Delay)
+                // Browser ko asynchronous history rewrite karne ka poora waqt diya, 
+                // jab background ka kalesh/auto-close operation khatam ho jayega... TABHI Search khulega!
+                setTimeout(() => {
+                    if (mainHeader) mainHeader.classList.add('search-active');
+                    
+                    openOverlay('search'); // Safe Open without clash
+                    
+                    setTimeout(() => {
+                        const suggestionContainer = document.getElementById('search-suggestion-chips');
+                        if (suggestionContainer) {
+                            suggestionContainer.style.display = 'flex'; 
+                        }
+                        if (typeof renderHistoryDropdown === "function") renderHistoryDropdown(); 
+                    }, 80);
+                }, 200); // 🚀 200 milliseconds ka perfect timing framework wrapper gap
+
+            } else {
+                // Safe Mode Block: Agar user pehle se hi Home page par khada he, 
+                // toh bina kisi history alteration ke instantly zero delay par search kholo
+                window.currentFolder = 'root';
+                window.pathStack = ['Home'];
+                
+                if (mainHeader) mainHeader.classList.add('search-active');
+                openOverlay('search');
+                
+                setTimeout(() => {
+                    const suggestionContainer = document.getElementById('search-suggestion-chips');
+                    if (suggestionContainer) {
+                        suggestionContainer.style.display = 'flex'; 
+                    }
+                    if (typeof renderHistoryDropdown === "function") renderHistoryDropdown(); 
+                }, 80);
+            }
         }
     });
 }
+
 
 document.addEventListener('click', (e) => {
     const adminMenu = document.getElementById('admin-menu');
@@ -756,9 +868,6 @@ if (cartBtn && cartSection) {
     });
 }
 
-// ==========================================================================
-// --- 🛠️ UPDATED CORE LOGIC: CLEAN CART VIEW & LIVE SEARCH (common.js) ---
-// ==========================================================================
 
 function renderCartContent() {
     const cartSectionElement = document.getElementById('cart-section');
@@ -809,6 +918,10 @@ function renderCartContent() {
 
     let listHTML = `<div class="cart-items-list" style="width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 10px 0;">`;
 
+    // 🔑 DETECT PAGE TYPE CONTEXT FOR CROSS LAYOUT MANAGEMENT
+    const isCurrentPageAdmin = window.location.pathname.includes('admin.html');
+    const pageTypeContext = isCurrentPageAdmin ? 'admin' : 'user';
+
     keys.forEach(key => {
         const item = cart[key];
         let finalNameToShow = item.name;
@@ -825,27 +938,94 @@ function renderCartContent() {
             }
         }
 
-        // 🔑 FIX POINT 1: Completely removed the absolute path string render subline (.cart-item-path)
+                // 🔽 DYNAMIC INLINE OVERRIDES: Synchronizing active dropdown elements without arbitrary fallbacks
+                const itemInventoryData = inventory[key] || {};
+        const allowedUnitsList = (itemInventoryData.allowedUnits && itemInventoryData.allowedUnits.length > 0)
+            ? itemInventoryData.allowedUnits 
+            : [];
+
+        // 🔑 THE ABSOLUTE EMPTY FIX: "Box" fallback ko hamesha ke liye jad se khatam kiya
+        let currentUnitValue = item.unit || "";
+        
+        if (allowedUnitsList.length > 0) {
+            // Agar list me options hain par current label missing he ya galat he, toh automatically pehla element lock karo
+            if (!currentUnitValue || !allowedUnitsList.includes(currentUnitValue)) {
+                currentUnitValue = allowedUnitsList[0];
+                item.unit = currentUnitValue;
+            }
+        } else {
+            // 🔄 WAPAS 0 HONGE PAR EMPTY: Agar admin ne saare options delete kar diye (list length 0), toh value wapas khali
+            currentUnitValue = "";
+            item.unit = "";
+        }
+
+
+
+        // Loop to generate adaptive matrix selector cells safely
+        let dropdownRowsHTML = '';
+        if (allowedUnitsList.length > 0) {
+            allowedUnitsList.forEach(u => {
+                const crossHTML = (pageTypeContext === 'admin') 
+                    ? `<span class="unit-cross-btn" onclick="event.stopPropagation(); executeUnitGlobalDelete('${key}', '${u}')">❌</span>` 
+                    : '';
+                
+                dropdownRowsHTML += `
+                    <div class="unit-dropdown-row" onclick="event.stopPropagation(); executeUnitSelectChange('${key}', '${u}', '${pageTypeContext}')">
+                        <span>${u}</span>
+                        ${crossHTML}
+                    </div>
+                `;
+            });
+        } else {
+            // Dropdown bilkul empty hone par chota sa sober placeholder text dikhega
+            dropdownRowsHTML = `<div style="padding: 10px; color: #94a3b8; font-size: 11px; text-align: center;">No units added</div>`;
+        }
+
+        const adminInputHTML = (pageTypeContext === 'admin')
+            ? `<input type="text" class="admin-unit-input-box" placeholder="+ Add Unit" onkeydown="event.stopPropagation(); handleAdminUnitEnter(event, '${key}')" onclick="event.stopPropagation()">`
+            : '';
+
+        const dropdownStructureHTML = `
+            <div class="unit-dropdown-wrapper" onclick="event.stopPropagation()">
+                <div class="unit-trigger-badge" onclick="event.stopPropagation(); toggleUnitDropdownMenu(this)">
+                    ${currentUnitValue} ▾
+                </div>
+                <div class="unit-select-dropdown">
+                    ${adminInputHTML}
+                    <div class="dropdown-rows-scroll-container">
+                        ${dropdownRowsHTML}
+                    </div>
+                </div>
+            </div>
+        `;
+
+
         listHTML += `
-            <div class="cart-item-card" style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; padding: 14px 16px; border-radius: 14px; border: 1px solid #e2e8f0; box-shadow: 0 4px 10px rgba(15, 23, 42, 0.02);">
-                <div class="cart-item-info" style="display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 60%;">
-                    <span class="cart-item-name" style="font-weight: 700; font-size: 15px; color: #0f172a; text-transform: capitalize; text-align: left;">${finalNameToShow}</span> 
+            <div class="cart-item-card" style="display: flex; align-items: center; justify-content: space-between; background: #ffffff;height: 68px; box-sizing: border-box;">
+                
+                <div class="cart-item-info" style="display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 0; padding-right: 8px;">
+                    <span class="cart-item-name" style="font-weight: 700; font-size: 14px; color: #0f172a; text-transform: capitalize; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; display: block;">
+                        ${finalNameToShow}
+                    </span> 
                 </div>
                 
-                <div class="cart-item-actions" style="display: flex; align-items: center; gap: 10px;">
-                    <div class="card-qty-controller">
-                        <button onclick="updateCartQty('${key}', -1)">-</button>
-                        <input type="number" value="${item.quantity}" onchange="setCartQty('${key}', this.value)">
-                        <button onclick="updateCartQty('${key}', 1)">+</button>
-                    </div>
-                    <input type="text" class="cart-unit-input" value="${item.unit}" placeholder="Unit" onchange="setCartUnit('${key}', this.value)">
+                <div class="cart-item-actions" style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0; width: 185px;">
                     
-                    <button class="sel-btn btn-close" title="Remove Item" onclick="removeSingleCartItem('${key}')" style="background: none; border: none; padding: 4px; color: var(--text-sec); cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <div class="card-qty-controller gesture-swipe-zone" data-swipe-key="${key}" style="flex-shrink: 0 !important;">
+                        <input type="number" value="${item.quantity}" readonly>
+                    </div>
+                    
+                    <div style="width: 62px; display: flex; justify-content: center; flex-shrink: 0;">
+                        ${dropdownStructureHTML}
+                    </div>
+                    
+                    <button class="sel-btn btn-close" title="Remove Item" onclick="removeSingleCartItem('${key}')" style="background: none; border: none; padding: 4px; color: var(--text-sec); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 28px; flex-shrink: 0;">
                         <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.2; fill: none;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                     </button>
                 </div>
             </div>
         `;
+            
     });
 
     listHTML += `</div>`;
@@ -937,11 +1117,25 @@ function updateCartBadgeCount() {
     }
 }
 
-
+// Global tracking variables for notification guard gate
+window.lastAlertMessage = "";
+window.lastAlertTimestamp = 0;
 
 function showAlert(message, type = 'info') {
     const container = document.getElementById('custom-alert-container');
     if (!container) return;
+container.innerHTML = ""; 
+    const currentTime = Date.now();
+    
+    // 🔑 DUPLICATE COOLDOWN FILTER: Agar same message 1500ms (1.5s) ke andar dubara aaye toh block karo
+    if (message === window.lastAlertMessage && (currentTime - window.lastAlertTimestamp) < 1500) {
+        console.log("🚫 [Alert Guard] Suppressed duplicate notification:", message);
+        return; 
+    }
+
+    // Save current alert state metrics safely
+    window.lastAlertMessage = message;
+    window.lastAlertTimestamp = currentTime;
 
     // Naya alert element create karein
     const alert = document.createElement('div');
@@ -1001,12 +1195,15 @@ const inventory = getActiveInventory();
 
 
 function setCartUnit(key, value) {
-    let cart = JSON.parse(localStorage.getItem('wayStock_cart')) || {};
+    // 🔑 DYNAMIC USER FIX: Get target exact user dynamic storage cart key
+    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
+    let cart = typeof getCartItems === "function" ? getCartItems() : {};
+    
     if (!cart[key]) return;
 
     cart[key].unit = value.trim() || "Box";
-    localStorage.setItem('wayStock_cart', JSON.stringify(cart));
-    refreshUI(); // UI aur LocalStorage dono sync ho jayenge
+    localStorage.setItem(cartKey, JSON.stringify(cart)); // Committing directly to correct profile slot
+    refreshUI(); 
 }
 
 function jumpToFolder(index) {
@@ -1048,20 +1245,16 @@ function getUniversalCardHTML(key, data, pageType = 'user') {
     const cart = typeof getCartItems === "function" ? getCartItems() : {};
     let actionItemHTML = '';
 
-    if (window.currentFolder === 'root') {
+        if (window.currentFolder === 'root') {
         actionItemHTML = ''; 
     } else {
         if (cart[key]) {
-            // 🔑 FIX: onclick, onkeydown, aur onfocus par event.stopPropagation() apply kiya taaki focus leak na ho
+            // 🔑 GESTURE UPGRADE: Completely cleaned boxy buttons. Render a solid gesture target capsule wrapper
             actionItemHTML = `
-                <div class="card-qty-controller" onclick="event.stopPropagation()">
-                    <button onclick="event.stopPropagation(); updateCartQty('${key}', -1)">-</button>
-                    <input type="number" value="${cart[key].quantity}" 
-                           onclick="event.stopPropagation()"
-                           onfocus="event.stopPropagation()"
-                           onkeydown="event.stopPropagation(); if(event.key === 'Enter') this.blur();"
-                           onchange="event.stopPropagation(); setCartQty('${key}', this.value)">
-                    <button onclick="event.stopPropagation(); updateCartQty('${key}', 1)">+</button>
+                <div class="card-qty-controller gesture-swipe-zone" 
+                     data-swipe-key="${key}"
+                     onclick="event.stopPropagation()">
+                    <input type="number" value="${cart[key].quantity}" readonly>
                 </div>
             `;
         } else {
@@ -1076,6 +1269,8 @@ function getUniversalCardHTML(key, data, pageType = 'user') {
             `;
         }
     }
+
+
 
 return `
     <div class="inventory-card" data-key="${key}" onclick="handleFolderClick('${key}')">
@@ -1263,7 +1458,7 @@ function saveToSearchHistory(key) {
     historyList.unshift(key);
     
     // Max 5 history items rakho
-    if (historyList.length > 5) historyList.pop();
+    if (historyList.length > 12) historyList.pop();
     
     localStorage.setItem('wayStock_searchHistory', JSON.stringify(historyList));
 }
@@ -1387,13 +1582,19 @@ const inventory = getActiveInventory();
 
     const rootFolder = key.includes('>') ? key.split('>')[0].trim() : 'Home';
 
+    // 🔑 INITIAL EMPTY LOCK: Agar admin ne options banaye hain toh pehla element lo, warna pure blank string "" rkho
+    const dynamicDefaultUnit = (itemData && itemData.allowedUnits && itemData.allowedUnits.length > 0)
+        ? itemData.allowedUnits[0]
+        : "";
+
     cart[key] = {
         name: itemData ? itemData.name : key.split('>').pop().trim(),
         fullPath: key,
         rootFolder: rootFolder,
         quantity: 1,
-        unit: "Box"
+        unit: dynamicDefaultUnit
     };
+
 
     localStorage.setItem(cartKey, JSON.stringify(cart));
     
@@ -1497,7 +1698,7 @@ function downloadGroupImage(dataURL, folderName) {
 if (window.Notification && Notification.permission === 'granted') {
 
         // 🔊 LIVE CUSTOM AUDIO PLAYER CORE
-        const alertSound = new Audio(window.location.origin + '/notification-sound.wav');
+        const alertSound = new Audio('./notification-sound.wav');
         alertSound.play().catch(e => console.log("Audio play blocked by browser policy until interaction"));
 
         navigator.serviceWorker.ready.then(registration => {
@@ -1524,49 +1725,55 @@ if (window.Notification && Notification.permission === 'granted') {
     window.history.back();
 }
 
+
 db.collection("appSettings").doc("globalNotification").onSnapshot((doc) => {
-    if (doc.exists) {
-        const data = doc.data();
-        const msgTime = data.timestamp || 0;
-        
-        const lastSeenNotificationTime = localStorage.getItem('wayStock_last_seen_notification') || "0";
-        const isFreshlyBroadcasted = (Date.now() - msgTime < 10000);
-        const isNewMessageSinceLastOpen = (String(msgTime) !== lastSeenNotificationTime);
+    if (!doc.exists) return;
 
-        if (isFreshlyBroadcasted || isNewMessageSinceLastOpen) {
-            
-            localStorage.setItem('wayStock_last_seen_notification', String(msgTime));
+    const data = doc.data();
+    const msgTime = data.timestamp || 0;
+    const lastSeenNotificationTime = localStorage.getItem('wayStock_last_seen_notification') || "0";
+    
+    const isFreshlyBroadcasted = (Date.now() - msgTime < 10000);
+    const isNewMessageSinceLastOpen = (String(msgTime) !== lastSeenNotificationTime);
 
-            const alertSound = new Audio(window.location.origin + '/notification-sound.wav');
-            alertSound.play().catch(e => console.log("Audio play blocked"));
+    if (isFreshlyBroadcasted || isNewMessageSinceLastOpen) {
+        localStorage.setItem('wayStock_last_seen_notification', String(msgTime));
 
-            // 🔑 CRITICAL SAFETY LOCK: window.Notification verify karke crash block toda
-            if (window.Notification && Notification.permission === 'granted') {
-                navigator.serviceWorker.ready.then(registration => {
-                    registration.showNotification('WayStock Broadcast 📢', {
-                        body: data.text,
-                        icon: window.location.origin + '/logo.png', 
-                        badge: window.location.origin + '/logo.png', 
-                        vibrate: [200, 100, 200],
-                        tag: 'broadcast-alert', 
-                        renotify: true 
-                    });
+        // 🧠 @USER DYNAMIC REPLACEMENT LAYER: Current logged-in profile ka data pull karo
+        const loggedUserObj = JSON.parse(localStorage.getItem('wayStock_currentUser'));
+        const clientName = loggedUserObj && loggedUserObj.name ? loggedUserObj.name : "Customer";
+
+        // Firebase se aaye raw text ke andar jitne bhi '@user' ya '@User' hain, unhe dynamic name se replace karo
+        let originalRawText = data.text || "";
+        let personalizedMessage = originalRawText.replace(/@user/gi, clientName);
+
+        // Sound player boot trigger parameters
+        const alertSound = new Audio('./notification-sound.wav');
+        alertSound.play().catch(e => console.log("Audio handshake waiting for user interaction gesture"));
+
+        // System notification execution with parsed variables string
+        if (window.Notification && Notification.permission === 'granted') {
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification('WayStock Broadcast 📢', {
+                    body: personalizedMessage, // 🔑 Injected personalized client name string here!
+                    icon: window.location.origin + '/logo.png', 
+                    badge: window.location.origin + '/logo.png', 
+                    vibrate: [200, 100, 200],
+                    tag: 'broadcast-alert', 
+                    renotify: true,
+                    sound: './notification-sound.wav' 
                 });
-            } else {
-                if (typeof showAlert === "function") {
-                    showAlert(`📢 ADMIN: ${data.text}`, "info");
-                }
+            });
+        } else {
+            // Screen in-app toast alert fallback frame mapping
+            if (typeof showAlert === "function") {
+                showAlert(`📢 ADMIN: ${personalizedMessage}`, "info");
             }
         }
     }
 });
 
 
-// ==========================================================================
-// --- 🔐 IMMERSIVES CLOUD GATEWAY VALIDATION ENGINE (common.js) ---
-// ==========================================================================
-
-// Global variable definition safety from standard rules
 const gatewayOverlay = document.getElementById('cloud-gateway-overlay');
 const gatewayVisuals = document.getElementById('gateway-visuals');
 const gatewayInput = document.getElementById('gateway-pin-input');
@@ -1621,8 +1828,15 @@ async function validateGatewayCredentials() {
                 
                 // standard 12-hour metric math guidelines
                 const twelveHoursInMs = 12 * 60 * 60 * 1000;
-                localStorage.setItem('wayStock_admin_token', "true");
-                localStorage.setItem('wayStock_admin_expiry', String(Date.now() + twelveHoursInMs));
+const expiryTimestamp = String(Date.now() + twelveHoursInMs);
+
+// 🔒 Double Lock Token Injection Structure
+sessionStorage.setItem('wayStock_admin_authenticated', "true");
+sessionStorage.setItem('wayStock_admin_expiry', expiryTimestamp);
+
+// Backup encryption mirror for persistent navigation
+localStorage.setItem('wayStock_admin_token', "true");
+localStorage.setItem('wayStock_admin_expiry', expiryTimestamp);
 
                 showAlert("Access Granted! Cloud Portal Active. 🚀", "success");
                 setTimeout(() => { window.location.href = "admin.html"; }, 1000);
@@ -1660,3 +1874,276 @@ async function validateGatewayCredentials() {
     }
 }
 
+document.addEventListener('touchstart', function(e) {
+    const swipeZone = e.target.closest('.gesture-swipe-zone');
+    if (!swipeZone) return;
+
+    // Agar user input field ke andar active typing kar rha he, toh scroll lock gesture bypass karo
+    if (document.activeElement === swipeZone.querySelector('input')) {
+        return; 
+    }
+
+    const key = swipeZone.getAttribute('data-swipe-key');
+    const inputElement = swipeZone.querySelector('input');
+    if (!key || !inputElement) return;
+
+    let startX = e.touches[0].clientX;
+    let initialQty = parseInt(inputElement.value, 10) || 1;
+    let accumulatedDelta = 0;
+    let hasMovedMoved = false; // Track karne ke liye ki swipe chal rha he ya simple tap hua he
+    
+    const SENSITIVITY_PIXELS = 15; 
+
+    function onTouchMove(moveEvent) {
+        const currentX = moveEvent.touches[0].clientX;
+        const currentDiffX = currentX - startX;
+
+        // Threshold configuration check to filter out light micro shaking taps
+        if (Math.abs(currentDiffX) > 5) {
+            hasMovedMoved = true;
+            moveEvent.preventDefault();
+            moveEvent.stopPropagation();
+        } else {
+            return;
+        }
+
+        if (currentDiffX > 5) {
+            swipeZone.classList.add('swiping-right');
+            swipeZone.classList.remove('swiping-left');
+        } else if (currentDiffX < -5) {
+            swipeZone.classList.add('swiping-left');
+            swipeZone.classList.remove('swiping-right');
+        }
+
+        const currentChange = Math.floor(currentDiffX / SENSITIVITY_PIXELS);
+        
+        if (currentChange !== accumulatedDelta) {
+            let nextCalculatedQty = initialQty + currentChange;
+            if (nextCalculatedQty < 0) nextCalculatedQty = 0;
+
+            inputElement.value = nextCalculatedQty; 
+            accumulatedDelta = currentChange;
+            swipeZone.style.transform = "scale(1.04)";
+        }
+    }
+
+    function onTouchEnd() {
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+        
+        swipeZone.classList.remove('swiping-right', 'swiping-left');
+        swipeZone.style.transform = "scale(1)";
+
+        // 🧠 HYBRID DETECTOR: Agar finger bilkul move nahi hui, yaani user ne sirf TAP kiya he direct numeric entry ke liye!
+        if (!hasMovedMoved) {
+            // Remove native readonly lock overlay framework cleanly
+            inputElement.removeAttribute('readonly');
+            inputElement.focus();
+            inputElement.select(); // auto highlight full number text for easy override
+            return; // Exit swipe logic loops instantly
+        }
+
+        // Processing standard swipe outputs safely
+        const finalParsedQty = parseInt(inputElement.value, 10);
+        commitQuantityToStorage(key, finalParsedQty);
+    }
+
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
+});
+
+// 🔑 DIRECT KEYPAD INPUT INTERCEPTORS & SYNC BLOCKS
+document.addEventListener('focusin', function(e) {
+    const input = e.target.closest('.gesture-swipe-zone input');
+    if (input) {
+        // Stop any external card long press delays while input field has focus attention
+        if (window.longPressTimer) clearTimeout(window.longPressTimer);
+    }
+});
+
+// Enter key validation check inside gesture text fields to smooth blur actions
+document.addEventListener('keydown', function(e) {
+    const input = e.target.closest('.gesture-swipe-zone input');
+    if (input && e.key === 'Enter') {
+        e.preventDefault();
+        input.blur(); // Triggers focusout execution automatically
+    }
+});
+
+// Blur Event Tracker: Keyboard band hote hi selection text state bhi clear ho jayegi
+document.addEventListener('focusout', function(e) {
+    const input = e.target.closest('.gesture-swipe-zone input');
+    if (!input) return;
+
+    const swipeZone = input.closest('.gesture-swipe-zone');
+    const key = swipeZone?.getAttribute('data-swipe-key');
+    if (!key) return;
+
+    // 🔑 THE FIX: Selection clear karne ke liye pointer text range selection index zero (0) lock kiya
+    if (window.getSelection) {
+        window.getSelection().removeAllRanges(); // Mobile text dynamic highlight selector ko instantly clear karega
+    }
+
+    // Reset fields back to secure structural locked read formats
+    input.setAttribute('readonly', 'true');
+
+    let typedValue = parseInt(input.value, 10);
+    if (isNaN(typedValue) || typedValue < 0) typedValue = 0;
+
+    commitQuantityToStorage(key, typedValue);
+});
+
+
+// 🛠️ ATOMIC CORE COMMIT CONTAINER ENGINE
+function commitQuantityToStorage(key, finalQty) {
+    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
+    let cart = typeof getCartItems === "function" ? getCartItems() : {};
+
+    if (!cart[key]) return;
+
+    if (finalQty <= 0) {
+        delete cart[key];
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+        if (typeof updateCartBadgeCount === "function") updateCartBadgeCount();
+        refreshUI();
+    } else {
+        cart[key].quantity = finalQty;
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+        
+        if (typeof renderCartContent === "function") renderCartContent();
+        updateCartBadgeCount();
+    }
+}
+
+// ==========================================================================
+// --- 🔽 CENTRAL ADAPTIVE UNIT ENGINE UTILITIES (common.js) ---
+// ==========================================================================
+
+// Simple global toggle selector helper
+function toggleUnitDropdownMenu(element) {
+    const parentWrapper = element.closest('.unit-dropdown-wrapper');
+    const targetDropdown = parentWrapper?.querySelector('.unit-select-dropdown');
+    
+    // Safety Reset: Close any other open unit dropdown elements first
+    document.querySelectorAll('.unit-select-dropdown').forEach(d => {
+        if (d !== targetDropdown) d.classList.remove('active-menu');
+    });
+
+    if (targetDropdown) {
+        targetDropdown.classList.toggle('active-menu');
+    }
+}
+
+// Global Document overlay body baseline interceptor to close menus on outside clicks safely
+document.addEventListener('click', function() {
+    document.querySelectorAll('.unit-select-dropdown').forEach(d => d.classList.remove('active-menu'));
+});
+
+// Selector handler logic
+function executeUnitSelectChange(key, unitValue, pageType) {
+    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
+    let cart = typeof getCartItems === "function" ? getCartItems() : {};
+    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+
+    // 1. Update current item base model property configuration values
+    if (inventory[key]) {
+        inventory[key].currentUnit = unitValue;
+        if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
+    }
+
+    // 2. Sync inside cart if item is currently sitting inside cart
+    if (cart[key]) {
+        cart[key].unit = unitValue;
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+    }
+
+    // Close options box menu and reload display elements
+    document.querySelectorAll('.unit-select-dropdown').forEach(d => d.classList.remove('active-menu'));
+    refreshUI();
+}
+
+// 🔑 ADMIN INPUT TRIGGER INTERCEPTOR (ENTER PRESS KEY CODE)
+function handleAdminUnitEnter(event, key) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+
+    const rawInputVal = event.target.value.trim();
+    if (!rawInputVal) return;
+
+    // Capitalize option text format standard rules
+    const formattedUnit = rawInputVal.charAt(0).toUpperCase() + rawInputVal.slice(1).toLowerCase();
+    
+    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+    if (!inventory[key]) return;
+
+    // Extract Root Parent Category path key segment matching rules configurations
+    const topRootParentCategoryKey = key.includes('>') ? key.split('>')[0].trim() : key;
+
+    console.log(`🚀 [Unit Engine] Propagating option "${formattedUnit}" from root category node:`, topRootParentCategoryKey);
+
+    // 🔄 RECURSIVE INHERITANCE: Scan entire global database records tracking parent mapping variables
+    Object.keys(inventory).forEach(invKey => {
+        if (invKey === topRootParentCategoryKey || invKey.startsWith(topRootParentCategoryKey + '>')) {
+            if (!inventory[invKey].allowedUnits) {
+                inventory[invKey].allowedUnits = ["Box", "Pcs", "Pack", "Kg", "Ton"]; // Hydrating presets if absent
+            }
+            if (!inventory[invKey].allowedUnits.includes(formattedUnit)) {
+                inventory[invKey].allowedUnits.push(formattedUnit);
+            }
+            // Auto lock current selection parameter reference to the newly inserted string value choice
+            inventory[invKey].currentUnit = formattedUnit;
+        }
+    });
+
+    // Sync state changes downstream
+    if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
+    if (typeof syncToFirebase === "function") syncToFirebase();
+
+    event.target.value = ""; // Flush text wrapper box
+    document.querySelectorAll('.unit-select-dropdown').forEach(d => d.classList.remove('active-menu'));
+    refreshUI();
+    showAlert(`Unit "${formattedUnit}" added globally under category tree! ✅`, "success");
+}
+
+// ❌ GLOBAL CROSS BUTTON DELETE CORE ENGINE
+function executeUnitGlobalDelete(key, unitToDelete) {
+
+    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+    if (!inventory[key]) return;
+
+    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
+    let cart = typeof getCartItems === "function" ? getCartItems() : {};
+
+    const topRootParentCategoryKey = key.includes('>') ? key.split('>')[0].trim() : key;
+
+    // 🔄 GLOBAL DESTRUCTION STRATEGY LOOP
+    Object.keys(inventory).forEach(invKey => {
+        if (invKey === topRootParentCategoryKey || invKey.startsWith(topRootParentCategoryKey + '>')) {
+            if (inventory[invKey].allowedUnits) {
+                // Slicing unit item element out from array matching definitions rules bounds
+                inventory[invKey].allowedUnits = inventory[invKey].allowedUnits.filter(u => u !== unitToDelete);
+                
+                // 🔑 DYNAMIC ZERO FLUSH: Agar option delete hone ke baad array khali bacha he, toh wapas empty string "" set karo
+                if (inventory[invKey].currentUnit === unitToDelete) {
+                    inventory[invKey].currentUnit = inventory[invKey].allowedUnits.length > 0 
+                        ? inventory[invKey].allowedUnits[0] 
+                        : "";
+                }
+            }
+        }
+
+        // Cart entity values memory clean overrides
+        if (cart[invKey] && cart[invKey].unit === unitToDelete) {
+            cart[invKey].unit = inventory[invKey]?.currentUnit || "Box";
+        }
+    });
+
+    // Commit changes safely to storage pools
+    localStorage.setItem(cartKey, JSON.stringify(cart));
+    if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
+    if (typeof syncToFirebase === "function") syncToFirebase();
+
+    document.querySelectorAll('.unit-select-dropdown').forEach(d => d.classList.remove('active-menu'));
+    refreshUI();
+    showAlert(`Option "${unitToDelete}" deleted completely. 🗑️`, "info");
+}

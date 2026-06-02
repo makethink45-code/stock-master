@@ -42,8 +42,7 @@ body, html {
 .cart-item-name, 
 .search-row-text,
 .step-title-text,
-.inventory-card,
-.inventory-card * {
+.inventory-card, .breadcrumb-container *{
     -webkit-user-select: none !important;      /* Safari/Chrome Mobile */
     -webkit-touch-callout: none !important;    /* iOS long-press menu wrapper override */
     -moz-user-select: none !important;         /* Firefox */
@@ -212,6 +211,8 @@ button,
     -ms-overflow-style: none;
     transform: translateX(0);
     visibility: visible;
+    box-shadow: 0 2px 0px rgba(15, 23, 42, 0.02);
+    border-bottom: 1px solid #f1f5f9
 }
 
 .breadcrumb-container::-webkit-scrollbar {
@@ -743,50 +744,36 @@ input:checked + .toggle-slider:before {
     width: 22px; /* Thoda stretch hoga click par */
 }
 
-.card-qty-controller {
-    display: flex;
-    align-items: center;
-    background: transparent; /* No heavy container background */
-    border: none;
-    padding: 0;
-    gap: 0px;
-}
-
-.card-qty-controller button:hover {
-    background: rgba(15, 23, 42, 0.1);
-}
-
-.card-qty-controller button:active {
-    transform: scale(0.9);
-    background: rgba(37, 99, 235, 0.15); /* Soft blue tint on click */
-    color: var(--primary);
-}
-
-.card-qty-controller input[type="number"]::-webkit-inner-spin-button,
-
-.card-qty-controller input[type="number"]::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
 .cart-items-list {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px;
-    overflow-y: auto;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0px !important; /* 🧽 Flat Look: Rows ke beech ka extra gap zero kiya */
+    
+    /* 🚀 CUSHION PADDING: Bottom padding 100px di taaki elements checkout div ke piche na daben */
+    padding: 0px 0px 100px 0px !important; 
+    
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    box-sizing: border-box !important;
 }
 
 .cart-item-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #ffffff;
-    padding: 14px 16px;
-    border-radius: 14px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.02);
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #ffffff !important;
+    padding: 0 16px !important; /* Perfect inner indentation */
+    
+    height: 64px !important;
+    min-height: 64px !important;
+    max-height: 64px !important;
+    flex-shrink: 0 !important; /* Context loop me items compress hone se block honge */
+    box-sizing: border-box !important;
+    
+    border: none !important;
+    border-radius: 0 !important;
+    border-bottom: 1px solid #f1f5f9 !important; /* Soft flat separation line structure */
 }
 
 .cart-item-info {
@@ -841,10 +828,94 @@ input:checked + .toggle-slider:before {
     justify-content: space-between;
     padding: 16px;
     background: #ffffff;
-    border-top: 1px solid #e2e8f0;
     width: 100%;
+    border-top: 1px solid #e2e8f0;
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.03);
 }
+
+
+/* ==========================================================================
+   --- 📱 GESTURE QUANTITY SWIPE ZONE CAPSULE (style.css) ---
+   ========================================================================== */
+.card-qty-controller {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: #f1f5f9 !important; /* Premium ultra-light slate base */
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 20px !important; /* Clean rounded capsule */
+    height: 36px !important;
+    width: 90px !important; /* Fixed bounds for optimal finger tracking */
+    position: relative !important;
+    overflow: hidden !important;
+    cursor: ew-resize !important; /* Indicating left-right scrolling option */
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease !important;
+    touch-action: none !important; /* 🔑 CRITICAL: Mobile browser default refresh scroll ko block karega swipe ke waqt */
+}
+
+/* Dynamic visual feedback states during gesture execution */
+.card-qty-controller.swiping-right {
+    background-color: #ecfdf5 !important; /* Smooth soft emerald success tint */
+    border-color: #a7f3d0 !important;
+}
+
+.card-qty-controller.swiping-left {
+    background-color: #fff1f2 !important; /* Smooth soft rose error/danger tint */
+    border-color: #fecdd3 !important;
+}
+
+.card-qty-controller input[type="number"] {
+    width: 100% !important;
+    font-size: 14.5px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    text-align: center !important;
+    background: transparent !important;
+    border: none !important;
+    letter-spacing: -0.3px !important;
+    outline: none !important;
+    padding: 0 4px !important;
+    /* 🔑 POINTER EVENTS REMOVED: Ab user text par click karke direct input activate kar payega */
+}
+
+/* User jab input par click karega toh capsule ka border halka blue ho jayega subtle clear notification ke liye */
+.card-qty-controller:focus-within {
+    border-color: var(--primary) !important;
+    background-color: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
+}
+
+
+/* Subtle background indicator arrows inside capsule to hint gesture control */
+.card-qty-controller::before {
+    content: '‹';
+    position: absolute;
+    left: 8px;
+    color: #94a3b8;
+    font-size: 16px;
+    font-weight: bold;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.card-qty-controller::after {
+    content: '›';
+    position: absolute;
+    right: 8px;
+    color: #94a3b8;
+    font-size: 16px;
+    font-weight: bold;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.card-qty-controller.swiping-right::after { color: #10b981; opacity: 1; }
+.card-qty-controller.swiping-left::before { color: #f43f5e; opacity: 1; }
+
+
+
 
 .total-info {
     font-size: 14px;
@@ -1136,11 +1207,6 @@ input:checked + .toggle-slider:before {
     background-color: #f1f5f9;
 }
 
-.inventory-card:active {
-    transform: scale(0.985);
-    background-color: #f8fafc !important;
-    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.01) !important;
-}
 
 .main-content-area {
     /* 🔑 FIX 1: Flex context define kiya taaki height calculations automate hon */
@@ -1155,10 +1221,12 @@ input:checked + .toggle-slider:before {
     overflow-y: auto !important; /* Forces native touch-scrolling activation */
     -webkit-overflow-scrolling: touch; /* Mobile Smooth inertial scrolling momentum */
     
-    padding: 12px 16px 100px 16px; /* Bottom padding 100px ki taaki aakhiri card floating buttons ke piche na dabe */
+    /* 🧽 Side spaces zero kiye edge-to-edge continuity ke liye, top par smooth border line backup rakhi */
+    padding: 0px 0px 100px 0px !important; 
+    gap: 0px !important; /* Elements ke beech ka unwanted vertical gap completely clear */
+
     display: flex;
     flex-direction: column;
-    gap: 10px; 
     box-sizing: border-box;
     position: relative;
     
@@ -1173,65 +1241,90 @@ input:checked + .toggle-slider:before {
     height: 0 !important;
 }
 
-.inventory-card {
-    background: #ffffff !important;
-    border-radius: 14px !important; 
-    height: 64px !important; 
-    min-height: 64px !important; /* 🔑 CRITICAL FIX: Browser ko card height compress karne se rokega */
-    padding: 0 16px !important;
-    
-    display: flex !important;
-    align-items: center !important; 
-    justify-content: space-between !important;
-    position: relative !important; /* Stack context fix */
-    
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.02), 
-                0 1px 3px rgba(15, 23, 42, 0.03) !important;
-    border: 1px solid rgba(226, 232, 240, 0.9) !important;
-    
-    transition: transform 0.15s ease, background-color 0.15s ease;
-    box-sizing: border-box !important; 
-    margin-bottom: 2px !important; /* Clean explicit tracking margins */
-    width: 100% !important;
-    flex-shrink: 0 !important; /* 🔑 CRITICAL FIX: Overlap loop structural block */
-}
-
 /* ==========================================================================
-   --- 🪙 TWO-WAY 3D COIN FLICK ENGINE (style.css) ---
+   --- 📦 FLAT MINIMALIST INVENTORY CARD GRID (style.css) ---
    ========================================================================== */
-
-/* Selected Card Background Style */
-.inventory-card.selected-card {
-    background: #f5f3ff !important; /* Premium Soft Indigo Tint */
-    border-left: 4px solid var(--primary) !important; /* Deep Indigo indicator */
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.03) !important;
-    transition: background-color 0.25s ease, border-left 0.25s ease !important;
-}
-
-/* Parent Bounding Grid Frame with 3D Perspective */
 .inventory-card {
     background: #ffffff !important;
-    border-radius: 14px !important; 
-    height: 64px !important; 
-    min-height: 64px !important;
-    padding: 0 16px !important;
     display: flex !important;
     align-items: center !important; 
     justify-content: space-between !important;
     position: relative !important;
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.02) !important;
-    border: 1px solid rgba(226, 232, 240, 0.9) !important;
-    box-sizing: border-box !important; 
     width: 100% !important;
     flex-shrink: 0 !important;
+    box-sizing: border-box !important;
     
-    /* 🔑 3D DEPTH ENGINE */
+    /* 📏 FIXED IDENTICAL DIMENSION LOCK: Cart card se 100% match karega */
+    height: 64px !important;
+    min-height: 64px !important;
+    max-height: 64px !important;
+    
+    /* 🧽 VISUAL CLEAN REWIPE: Border, Shadow, aur Radius sab hataya */
+    border: none !important;
+    border-radius: 0 !important;
+  /*  border-bottom: 1px solid #f1f5f9 !important;  Soft minimal row divider line */
+    padding: 0 16px !important; /* Proper internal side padding */
+    
+    /* 🚀 HARDWARE ACCELERATION STABLE FOR SMOOTH SCROLL */
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+    -webkit-perspective: 1000px !important;
     perspective: 1000px !important; 
-    transform: translateZ(0); /* GPU acceleration */
-    transition: background-color 0.2s ease, border-left 0.2s ease;
+    -webkit-transform: translate3d(0, 0, 0) !important;
+    transform: translate3d(0, 0, 0) !important; 
+    will-change: background-color;
+    
+    transition: background-color 0.15s ease !important;
 }
 
-/* 🪙 THE COIN WRAPPER: Adding smooth transition directly for two-way flipping */
+/* Active touch pressure micro scale state adjustments */
+.inventory-card:active {
+    transform: none !important; /* Scale effects ko block kiya flat texture matching ke liye */
+    background-color: #f8fafc !important;
+}
+
+/* Selected item configuration layout updates */
+.inventory-card.selected-card {
+    background: #f5f3ff !important; /* Soft dynamic indicator background tint on selection mode */
+   /* border-bottom: 1px solid #ddd6fe !important;*/
+}
+
+/* ==========================================================================
+   --- 📦 CORE EDGE-TO-EDGE INVENTORY CARD FIXED (style.css) ---
+   ========================================================================== */
+.inventory-card {
+    background: #ffffff !important;
+    display: flex !important;
+    align-items: center !important; 
+    justify-content: space-between !important;
+    position: relative !important;
+    width: 100% !important;
+    flex-shrink: 0 !important;
+    box-sizing: border-box !important;
+    
+    /* 📏 FIXED GEOMETRY */
+    height: 64px !important;
+    min-height: 64px !important;
+    max-height: 64px !important;
+    
+    /* 🧽 VISUAL RESET: Complete Border aur Radius Removal */
+    border: none !important;
+    border-radius: 0px !important;
+    border-bottom: 1px solid #f1f5f9 !important; /* Elegant divider line */
+    padding: 0 16px !important;
+    
+    /* PERFORMANCE ISOLATION FOR MOBILE ENGINE */
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+    -webkit-perspective: 1000px !important;
+    perspective: 1000px !important; 
+    -webkit-transform: translate3d(0, 0, 0) !important;
+    transform: translate3d(0, 0, 0) !important; 
+    
+    transition: background-color 0.15s ease !important;
+}
+
+/* 🪙 THE COIN WRAPPER: Optimized with Layer Pre-rendering hints */
 .card-icon-wrapper {
     position: relative !important;
     width: 24px !important;
@@ -1239,9 +1332,15 @@ input:checked + .toggle-slider:before {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    transform-style: preserve-3d !important; /* */
     
-    /* 🔑 FIX: Transition ko wrapper par lagaya, isse select (0 to 180) aur deselect (180 to 0) dono waqt real motion dikhega! */
+    -webkit-transform-style: preserve-3d !important;
+    transform-style: preserve-3d !important; 
+    
+    /* 🔑 WILL-CHANGE OPTIMIZATION: Browser animation lag ko 0ms kar dega scroll ke waqt */
+    will-change: transform;
+    
+    /* Transition ko wrapper par lagaya, isse select aur deselect dono waqt smooth motion dikhega! */
+    -webkit-transition: -webkit-transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
     transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important; 
 }
 
@@ -1339,16 +1438,6 @@ input:checked + .toggle-slider:before {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-}
-
-.card-qty-controller input[type="number"] {
-    width: 34px !important;
-    font-size: 14.5px !important;
-    font-weight: 800 !important;
-    color: var(--primary) !important;
-    text-align: center !important;
-    background: transparent !important;
-    border: none !important;
 }
 
 .card-add-btn {
@@ -1764,4 +1853,124 @@ input:checked + .toggle-slider:before {
 .accordion-step-wrapper.step-open .accordion-arrow-icon {
     transform: rotate(180deg);
     color: var(--primary);
+}
+
+/* ==========================================================================
+   --- 🔽 FIXED DROP-DOWN FLOATING & INNER SCROLL ENGINE (style.css) ---
+   ========================================================================== */
+.unit-dropdown-wrapper {
+    position: relative !important;
+    display: inline-block !important;
+}
+
+/* Custom Floating Non-clipping Dropdown Frame */
+.unit-select-dropdown {
+    position: absolute !important;
+    top: calc(-50%) !important;    right: -50% !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    z-index: 99999;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15) !important;
+    width: 140px !important;
+    display: none;
+    flex-direction: column !important;
+    padding: 4px !important;
+    box-sizing: border-box !important;
+}
+/* Simple Base Trigger Badge Look Aligned */
+.unit-trigger-badge {
+    padding: 6px 0 !important; /* Spacing text limits */
+    background: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 10px !important;
+    font-size: 12px !important; /* Slightly optimized size to support large strings like "Bunch" */
+    font-weight: 700 !important;
+    color: #334155 !important;
+    cursor: pointer !important;
+    
+    /* 🔑 THE VERTICAL COLUMN LOCK: Trigger bounds are now completely static */
+    width: 58px !important;
+    text-align: center !important;
+    display: block !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+
+
+.unit-select-dropdown.active-menu {
+    display: flex !important;
+}
+
+/* 🔑 THE FIX: List scroll container bounds locking */
+.dropdown-rows-scroll-container {
+    width: 100% !important;
+    max-height: 150px !important; /* Exact 3 se 4 rows dikhayega */
+    overflow-y: auto !important;  /* Sirf iske andar scrolling chalegi */
+    overflow-x: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
+    -webkit-overflow-scrolling: touch !important; /* Mobile fallback momentum smooth inertia */
+    touch-action: pan-y !important; /* Browser ko batayega ki sirf vertical scroll scroll karo inner list ko */
+}
+
+/* Hide native scrollbars for cross-browser clean look */
+.dropdown-rows-scroll-container::-webkit-scrollbar {
+    width: 4px !important;
+}
+.dropdown-rows-scroll-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1 !important;
+    border-radius: 10px !important;
+}
+
+/* Dropdown Rows Styles Layout */
+.unit-dropdown-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #1e293b !important;
+    cursor: pointer !important;
+    transition: background 0.15s !important;
+    flex-shrink: 0 !important; /* Rows kabhi vertical coordinates me dabengi nahi */
+}
+
+.unit-dropdown-row:hover, .unit-dropdown-row:active {
+    background: #f1f5f9 !important;
+}
+
+/* Admin Cross Button Design */
+.unit-cross-btn {
+    color: #94a3b8 !important;
+    font-size: 11px !important;
+    font-weight: bold !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    transition: all 0.15s !important;
+}
+.unit-cross-btn:hover {
+    background: #fee2e2 !important;
+    color: #f43f5e !important;
+}
+
+/* Admin Fast Text Input Layout inside Dropdown Window */
+.admin-unit-input-box {
+    width: calc(100% - 8px) !important;
+    height: 32px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    font-size: 12px !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    background: #f8fafc !important;
+    outline: none !important;
+    margin: 4px 4px 6px 4px !important;
+    box-sizing: border-box !important;
+    flex-shrink: 0 !important;
 }
