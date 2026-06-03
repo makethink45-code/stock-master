@@ -328,7 +328,7 @@ window.renderAdminInventory = function() {
             card.classList.add('folder-morph-active');
         }
 
-        if (window.selectedCards && window.selectedCards.includes(key)) {
+        if (window.WayStockAdminState.selectedCards && window.WayStockAdminState.selectedCards.includes(key)) {
             card.classList.add('selected-card');
         }
 
@@ -378,12 +378,14 @@ const inventory = getActiveInventory();
         // Flex display container active karein
         hintBadge.style.display = 'flex';
         
-        // Standalone independent capsules HTML injection
-        hintBadge.innerHTML = matches.map(match => `
-            <span class="individual-hint-chip" style="background: #eff6ff; color: #2563eb; padding: 5px 11px; border-radius: 20px; font-weight: bold; font-size: 11px; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: inline-block;">
-                💡 ${match}
-            </span>
-        `).join('');
+// INSIDE document.getElementById('modal-input')?.addEventListener('input'...) BLOCK:
+// Hint chips ko template literals me draw karte waqt brand colors apply kijiye:
+hintBadge.innerHTML = matches.map(match => `
+    <span class="individual-hint-chip" style="background: #e6f4f5; color: #1d6881; padding: 5px 11px; border-radius: 20px; font-weight: bold; font-size: 11px; border: 1px solid #bce2e4; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: inline-block;">
+        💡 ${match}
+    </span>
+`).join('');
+
 
         // Listeners integration to handle auto-fill actions
         const chips = hintBadge.querySelectorAll('.individual-hint-chip');
@@ -412,26 +414,27 @@ const inventory = getActiveInventory();
     }
 });
 
-window.selectedCards = [];
-window.isSelectionMode = false;
-let longPressTimer = null;
-const LONG_PRESS_DURATION = 600; // 600ms hold time for tap threshold
-// ==========================================================================
-// --- 🔑 ACCURATE DATA-KEY ATTACHMENT TRACKER (admin-script.js) ---
-// ==========================================================================
+// REPLACE WITH THIS ENCAPSULATED ADMIN STATE PATTERN:
+// Ek single global wrapper state object jo hamari data matrix ko protect rakhega
+window.WayStockAdminState = {
+    selectedCards: [],
+    isSelectionMode: false,
+    longPressTimer: null,
+    LONG_PRESS_DURATION: 600 // Consistency lock
+};
+
 function toggleCardSelection(key) {
-    const index = window.selectedCards.indexOf(key);
+    const state = window.WayStockAdminState;
+    const index = state.selectedCards.indexOf(key);
     let isCurrentlySelected = false;
 
     if (index > -1) {
-        window.selectedCards.splice(index, 1);
+        state.selectedCards.splice(index, 1);
     } else {
-        window.selectedCards.push(key);
+        state.selectedCards.push(key);
         isCurrentlySelected = true;
     }
 
-    // 🎯 FIX POINT 2: DOM elements ko unki secure data-key attribute se pakda!
-    // Isse 1st folder ke andar ho ya kisi bhi level par, card 100% sahi se target hoga.
     const targetCardElement = document.querySelector(`.main-content-area .inventory-card[data-key="${key}"]`);
     
     if (targetCardElement) {
@@ -442,79 +445,75 @@ function toggleCardSelection(key) {
         }
     }
 
-    if (window.selectedCards.length === 0) {
+    if (state.selectedCards.length === 0) {
         exitSelectionMode();
     } else {
         updateSelectionHeaderUI();
     }
 }
 
-
 function updateSelectionHeaderUI() {
+    const state = window.WayStockAdminState;
     const toolbar = document.getElementById('selection-toolbar'); 
     const counterText = document.getElementById('selection-counter-text'); 
     const btnContainer = document.getElementById('selection-buttons-container'); 
     
     if (!toolbar || !counterText || !btnContainer) return;
 
-    if (!window.isSelectionMode || window.selectedCards.length === 0) {
+    if (!state.isSelectionMode || state.selectedCards.length === 0) {
         exitSelectionMode();
         return;
     }
 
+    // 🌟 ROUTING FIX: Agar state stack lock nahi he toh push karo taaki system back capture ho sake
     if (window.history.state?.overlay !== 'selection-mode') {
         history.pushState({ overlay: 'selection-mode' }, ""); 
     }
 
-    // 🔑 HEADER POP LOCK: Agar toolbar pehle se khula hua nahi he, tabhi .first-load animation class lagao!
     if (toolbar.style.display !== 'flex') {
         toolbar.style.display = 'flex';
         toolbar.classList.add('active-animation', 'first-load');
-        // 1 second baad .first-load class hata do taaki next selections par buttons stable rahein
         setTimeout(() => { toolbar.classList.remove('first-load'); }, 1000);
     }
 
-    // Counter update text injection without interrupting icons
-    counterText.innerText = `${window.selectedCards.length} Selected`; 
+    counterText.innerText = `${state.selectedCards.length} Selected`; 
 
     const inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
     const itemsToDisplay = Object.keys(inventory).filter(key => inventory[key].parent === window.currentFolder); 
     
-    const isAllSelected = window.selectedCards.length === itemsToDisplay.length; 
-    const isSingleSelected = window.selectedCards.length === 1; 
+    const isAllSelected = state.selectedCards.length === itemsToDisplay.length; 
+    const isSingleSelected = state.selectedCards.length === 1; 
 
-    // Counter badge text condition changes template layout update safely
+    // 🌟 COLOR UPGRADE: Svg contours ko hardcoded blue se badalkar var(--primary) par mapping kiya
     btnContainer.innerHTML = `
         <button class="sel-btn" title="${isAllSelected ? 'Deselect All' : 'Select All'}" onclick="toggleSelectAllAction(${isAllSelected})">
             ${isAllSelected 
                 ? `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" fill="var(--primary)" stroke="var(--primary)"/><polyline points="9 11 12 14 22 4" stroke="#ffffff" stroke-width="2.5"/></svg>`
-                : `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>`
+                : `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="var(--primary)"/></svg>`
             }
         </button>
 
         <button class="sel-btn" title="Add Selection to Cart" onclick="triggerBulkCartAction()">
-            <svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            <svg viewBox="0 0 24 24" stroke="var(--primary)"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
         </button>
 
         ${isSingleSelected ? `
         <button class="sel-btn" title="Edit Item Name" onclick="triggerSingleEditAction()">
-            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"></path></svg>
+            <svg viewBox="0 0 24 24" stroke="var(--primary)"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"></path></svg>
         </button>` : ''}
 
         <button class="sel-btn" title="Delete Selected" onclick="triggerBulkDeleteAction()">
-            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            <svg viewBox="0 0 24 24" stroke="var(--danger)"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
         </button>
     `; 
 }
 
 function exitSelectionMode(isBackAction = false) {
-    window.isSelectionMode = false;
-    window.selectedCards = [];
+    window.WayStockAdminState.isSelectionMode = false;
+    window.WayStockAdminState.selectedCards = [];
     
     isEditModeActive = false;
     editTargetKey = "";
-    const actionBtn = document.getElementById('modal-action-btn');
-    if (actionBtn) actionBtn.innerText = "Create Structure 🚀"; 
     
     const toolbar = document.getElementById('selection-toolbar'); 
     if (toolbar) {
@@ -527,7 +526,7 @@ function exitSelectionMode(isBackAction = false) {
         }, 200);
     }
     
-    // 🔑 FIXED: Multiple calls clash se bachne ke liye direct status aur explicit pop clean structure lock kiya
+    // 🌟 ROUTING SAFETY RESET: System pop engine hook balance setup
     if (!isBackAction && window.history.state?.overlay === 'selection-mode') {
         window.history.back();
     } else {
@@ -535,14 +534,13 @@ function exitSelectionMode(isBackAction = false) {
     }
 }
 
-
 let isEditModeActive = false; 
 let editTargetKey = "";       // Kis key ko edit kar rahe hain
 
 function triggerSingleEditAction() {
-    if (!window.selectedCards || window.selectedCards.length !== 1) return;
+    if (!window.WayStockAdminState.selectedCards || window.WayStockAdminState.selectedCards.length !== 1) return;
     
-    const selectedKey = window.selectedCards[0];
+    const selectedKey = window.WayStockAdminState.selectedCards[0];
     // Upgraded clean reference:
 const inventory = getActiveInventory();
 
@@ -577,9 +575,9 @@ function toggleSelectAllAction(shouldDeselectAll) {
     const itemsToDisplay = Object.keys(inventory).filter(key => inventory[key].parent === window.currentFolder);
 
     if (shouldDeselectAll) {
-        window.selectedCards = [];
+        window.WayStockAdminState.selectedCards = [];
     } else {
-        window.selectedCards = [...itemsToDisplay];
+        window.WayStockAdminState.selectedCards = [...itemsToDisplay];
     }
     
     // Select All / Deselect All par header stable rahega, icons refresh animation trigger nahi marenge
@@ -610,11 +608,11 @@ function setupSelectionEventsOnCard(card, key) {
             startY = e.clientY;
         }
         
-        if (longPressTimer) clearTimeout(longPressTimer);
+        if (window.WayStockAdminState.longPressTimer) clearTimeout(window.WayStockAdminState.longPressTimer);
         
-        longPressTimer = setTimeout(() => {
-            if (!window.isSelectionMode) {
-                window.isSelectionMode = true;
+        window.WayStockAdminState.longPressTimer = setTimeout(() => {
+            if (!window.WayStockAdminState.isSelectionMode) {
+                window.WayStockAdminState.isSelectionMode = true;
                 if (navigator.vibrate) navigator.vibrate(50); // Sharp haptic pop
                 toggleCardSelection(key);
             }
@@ -622,7 +620,7 @@ function setupSelectionEventsOnCard(card, key) {
     };
 
     const movePress = (e) => {
-        if (!longPressTimer) return;
+        if (!window.WayStockAdminState.longPressTimer) return;
         let currentX = 0, currentY = 0;
         if (e.type === 'touchmove' && e.touches.length > 0) {
             currentX = e.touches[0].clientX;
@@ -635,13 +633,13 @@ function setupSelectionEventsOnCard(card, key) {
         const diffY = Math.abs(currentY - startY);
 
         if (diffY > SCROLL_TOLERANCE || diffX > SCROLL_TOLERANCE) {
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
+            clearTimeout(window.WayStockAdminState.longPressTimer);
+            window.WayStockAdminState.longPressTimer = null;
         }
     };
 
     const endPress = () => {
-        if (longPressTimer) clearTimeout(longPressTimer);
+        if (window.WayStockAdminState.longPressTimer) clearTimeout(window.WayStockAdminState.longPressTimer);
     };
 
     // Attach native touch events for scrolling balance
@@ -668,7 +666,7 @@ function setupSelectionEventsOnCard(card, key) {
         const isFolder = freshInventory[key] && (freshInventory[key].type === 'folder' || (freshInventory[key].children && freshInventory[key].children.length > 0));
 
         // 🧠 SELECTION OVERLAY INTERCEPT BLOCK:
-        if (window.isSelectionMode === true) {
+        if (window.WayStockAdminState.isSelectionMode === true) {
             console.log("🔒 Selection Mode Active! Single click selection triggered for key:", key);
             // Folder Navigation system completely shut down here!
             toggleCardSelection(key);
@@ -682,16 +680,16 @@ function setupSelectionEventsOnCard(card, key) {
 }
 
 function triggerBulkDeleteAction() {
-    if (window.selectedCards.length === 0) return;
+    if (window.WayStockAdminState.selectedCards.length === 0) return;
 
-    if (confirm(`Kya aap in ${window.selectedCards.length} selected items aur unke saare sub-folders/products ko permanently delete karna chahte hain?`)) {
+    if (confirm(`Kya aap in ${window.WayStockAdminState.selectedCards.length} selected items aur unke saare sub-folders/products ko permanently delete karna chahte hain?`)) {
         let inventory = JSON.parse(localStorage.getItem('wayStock_inventory')) || {};
         
         // 🔑 MULTI-USER FIX: Static key ki jagah dynamic storage key use karein
         const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
         let cart = typeof getCartItems === "function" ? getCartItems() : {};
         
-        window.selectedCards.forEach(selectedKey => {
+        window.WayStockAdminState.selectedCards.forEach(selectedKey => {
             
             // --- 🔴 STEP 1: PARENT TREE CLEANUP ---
             const parentKey = inventory[selectedKey]?.parent; 
@@ -739,7 +737,7 @@ function triggerBulkCartAction() {
     const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
     let count = 0;
 
-    window.selectedCards.forEach(key => {
+    window.WayStockAdminState.selectedCards.forEach(key => {
         // Items ko folder ke andar check karke filter lagaya
         if (!cart[key] && inventory[key] && inventory[key].type === 'item') {
             const rootFolder = key.includes('>') ? key.split('>')[0].trim() : 'Home';
@@ -894,3 +892,180 @@ function toggleSettingsStep(drawerId, headerElement) {
         parentWrapper.classList.add('step-open');
     }
 }
+
+// ==========================================================================
+// --- 🔗 BRAND GRADIENT SYNCED APP LINK SHARE GENERATOR ENGINE (common.js) ---
+// ==========================================================================
+async function triggerAdminAppLinkSharing() {
+    // Menu dropdown safely close behavior
+    document.getElementById('admin-menu')?.classList.remove('active');
+    
+    showAlert("Generating Branded App Share Card... ⏳", "info");
+
+    const dpr = Math.max(window.devicePixelRatio || 1, 2);
+    const canvasWidth = 400;
+    const canvasHeight = 550;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidth * dpr;
+    canvas.height = canvasHeight * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // 🎨 Layout Backsheet color
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // ==========================================================================
+    // 🚀 DYNAMIC BRAND GRADIENT BUILDER (Matching your Logo perfectly)
+    // ==========================================================================
+    // Creating matching gradients for phone header and backgrounds
+    const brandGradient = ctx.createLinearGradient(100, 0, 300, 0);
+    brandGradient.addColorStop(0, '#1d6881'); // Deep Teal from your upper logo part
+    brandGradient.addColorStop(0.5, '#219395'); // Medium Cyan center mix
+    brandGradient.addColorStop(1, '#2abb9b'); // Greenish Teal from lower logo edge
+
+    // 1. DYNAMIC APP LOGO IMAGE LOADING CORE ENGINE
+    const loadAppLogoImage = () => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.src = 'logo.png'; 
+            img.onload = () => resolve(img);
+            img.onerror = () => {
+                console.warn("⚠️ Custom brand logo file loading failed. Using fallback gradient circle.");
+                resolve(null); 
+            };
+        });
+    };
+
+    const appLogoFileInstance = await loadAppLogoImage();
+
+    if (appLogoFileInstance) {
+        // 🟢 RENDER LOGO WITH SMOOTH BACKGROUND RING
+        ctx.save();
+        // Dynamic circular outer backdrop shadow glow
+        ctx.fillStyle = "rgba(33, 147, 149, 0.06)";
+        ctx.beginPath();
+        ctx.arc(canvasWidth / 2, 55, 30, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Clip logo inside perfect circle mesh
+        ctx.beginPath();
+        ctx.arc(canvasWidth / 2, 55, 26, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(appLogoFileInstance, (canvasWidth / 2) - 26, 29, 52, 52);
+        ctx.restore();
+    } else {
+        // 🔴 FALLBACK METHOD using the newly created gradient
+        ctx.fillStyle = brandGradient; 
+        ctx.beginPath();
+        ctx.arc(canvasWidth / 2, 55, 26, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 22px system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("W", canvasWidth / 2, 63);
+    }
+
+    // App Branding Label Header Title (Color synced with Logo dark tone)
+    ctx.fillStyle = "#114a5d"; 
+    ctx.font = "bold 21px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("WayStock Master", canvasWidth / 2, 108);
+
+    ctx.fillStyle = "#517483"; // Soter muted typography shade
+    ctx.font = "600 11.5px system-ui, -apple-system, sans-serif";
+    ctx.fillText("Smart Digital Stock Inventory Console", canvasWidth / 2, 126);
+
+    // 📱 MIDDLE LAYER: Smartphone Phone Mockup Outer Ring Boundary
+    const phoneX = 80;
+    const phoneY = 150;
+    const phoneW = 240;
+    const phoneH = 320;
+
+    ctx.strokeStyle = "#1a3b47"; // Deep slate teal phone borders
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(phoneX, phoneY, phoneW, phoneH, 22); 
+    ctx.stroke();
+
+    // Smartphone Screen Internal Backsheet Layout
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.roundRect(phoneX + 2, phoneY + 2, phoneW - 4, phoneH - 4, 20);
+    ctx.fill();
+
+    // 🌟 MOCK HEADER DIRECT GRADIENT FILL (Perfect Match!)
+    ctx.fillStyle = brandGradient;
+    ctx.beginPath();
+    ctx.roundRect(phoneX + 10, phoneY + 14, phoneW - 20, 32, 6);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("Way Stock (Najim)", phoneX + 20, phoneY + 33);
+
+    // Mockup Folder Grid List Components
+    const dummyFolders = ["Perfume 💧", "Sweet Paan ☘️", "Packets 🍟", "Cigarette 🚬", "Paan Masala 🎯"];
+    let currentBoxY = phoneY + 60;
+
+    dummyFolders.forEach(folderText => {
+        ctx.fillStyle = "#f8fafc";
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(phoneX + 12, currentBoxY, phoneW - 24, 26, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#219395"; // Folder bullet color matching logo core
+        ctx.font = "11px system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText("📁", phoneX + 22, currentBoxY + 17);
+
+        ctx.fillStyle = "#334155";
+        ctx.font = "600 10px system-ui, -apple-system, sans-serif";
+        ctx.fillText(folderText, phoneX + 42, currentBoxY + 16);
+
+        // Active switch check indicators (Synced with logo success color)
+        ctx.strokeStyle = "#2abb9b";
+        ctx.beginPath();
+        ctx.arc(phoneX + phoneW - 24, currentBoxY + 13, 4.5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        currentBoxY += 34; 
+    });
+
+    // 🏁 BOTTOM LAYER: Info text footer frame
+    ctx.fillStyle = "#475569";
+    ctx.font = "500 11px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Scan or click link below to join current inventory portal:", canvasWidth / 2, phoneY + phoneH + 25);
+
+    try {
+        const generatedInvitationCardURL = canvas.toDataURL("image/png");
+        const response = await fetch(generatedInvitationCardURL);
+        const blob = await response.blob();
+        const file = new File([blob], 'WayStock_App_Invitation.png', { type: "image/png" });
+
+        const clientPortalWebAddressLink = window.location.origin + "/index.html";
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: 'Join WayStock Mobile Terminal',
+                text: `👋 Greetings! Join my digital management portal via active link address:\n🔗 Link: ${clientPortalWebAddressLink}`
+            });
+        } else {
+            await navigator.share({
+                title: 'Join WayStock Mobile Terminal',
+                text: `👋 Greetings! Join my digital management portal via active link address:\n🔗 Link: ${clientPortalWebAddressLink}`
+            });
+        }
+    } catch (err) {
+        console.warn("Share link sequence aborted or collapsed:", err);
+    }
+}
+

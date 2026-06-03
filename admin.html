@@ -60,13 +60,17 @@
             <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
         </button>
 <div id="admin-menu" class="menu-dropdown">
-    <div class="menu-item">
+    <div class="menu-item" onclick="openActionModal('folder')">
         <span class="menu-icon">➕</span>
         <span>Add New Item</span>
     </div>
     <div class="menu-item">
         <span class="menu-icon">⚙️</span>
         <span>Setting</span>
+    </div>
+    <div class="menu-item" onclick="triggerAdminAppLinkSharing()">
+        <span class="menu-icon">🔗</span>
+        <span>Share App Link</span>
     </div>
 </div>
     </div>
@@ -195,6 +199,16 @@
     </div>
     <div id="preview-content-area" class="cart-body" style="justify-content: flex-start; overflow-y: auto; padding: 16px 0;">
         </div>
+</div>
+<div id="preview-zoom-overlay" class="preview-zoom-overlay">
+    
+    <button class="zoom-close-btn" onclick="closeInteractiveZoomView()" aria-label="Close View">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+    
+    <div class="zoom-viewport-container" onclick="event.stopPropagation()">
+        <img id="zoom-target-image" src="" alt="Magnified Slip Target" onclick="event.stopPropagation()">
+    </div>
 </div>
 
 <div id="custom-alert-container" class="alert-container"></div>

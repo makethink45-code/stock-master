@@ -6,19 +6,25 @@
     -webkit-tap-highlight-color: transparent;
 }
 
+
 :root {
-    /* 🎨 NEW THEME: Deep Slate Indigo & Luxury Executive Colors */
-    --primary: #4f46e5;          /* Premium Indigo instead of basic blue */
-    --primary-dark: #4338ca;
-    --success: #10b981;          /* Emerald Success Tint */
-    --danger: #f43f5e;           /* Rose Alert Accent */
-    --dark: #0f172a;             /* Dark Slate Core */
+    /* 🎨 NEW WAYSTOCK BRAND THEME (Perfect Match with Logo Gradient) */
+    --primary: #1d6881;          /* Deep Teal (Logo upper layer) */
+    --primary-dark: #114a5d;     /* Solid Dark Teal for active clicks */
+    --accent-cyan: #2abb9b;      /* Bright Greenish Cyan (Logo lower layer) */
+    --success: #10b981;          
+    --danger: #f43f5e;           
+    --dark: #0f172a;             
     --text-main: #1e293b;    
-    --text-sec: #64748b;     
+    --text-sec: #517483;         /* Balanced tone for matching */
     --bg-main: #f8fafc;      
     --border-base: #e2e8f0;
     --font-main: 'Iosevka Fixed', 'ui-monospace', 'SFMono-Regular', monospace;
+    
+    /* 🌟 Dynamic Gradient variable jo buttons ya header highlights me use ho sake */
+    --brand-gradient: linear-gradient(135deg, #1d6881 0%, #219395 50%, #2abb9b 100%);
 }
+
 
 body, html {
     width: 100%;
@@ -257,29 +263,7 @@ button,
     position: relative;
 }
 
-.main-content-area {
-    flex: 1; /* Body ke andar jitni space bachi he usko occupy karega */
-    width: 100%;
-    max-width: 100%;
-    
-    /* Strict viewport height subtraction mathematics */
-    height: calc(100vh - 106px); 
-    
-    overflow-y: scroll !important; /* Forces physical native scroll track */
-    -webkit-overflow-scrolling: touch !important; /* Mobile inertial smooth velocity glide */
-    
-    display: flex;
-    flex-direction: column;
-    gap: 10px; 
-    box-sizing: border-box;
-    position: relative;
-}
 
-.main-content-area::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
-}
 
 .search-wrapper:focus-within {
     border-color: var(--primary);
@@ -744,19 +728,19 @@ input:checked + .toggle-slider:before {
     width: 22px; /* Thoda stretch hoga click par */
 }
 
+/* REPLACE WITH THIS CLEAN CONTAINER STYLE: */
 .cart-items-list {
-    width: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 0px !important; /* 🧽 Flat Look: Rows ke beech ka extra gap zero kiya */
-    
-    /* 🚀 CUSHION PADDING: Bottom padding 100px di taaki elements checkout div ke piche na daben */
-    padding: 0px 0px 100px 0px !important; 
-    
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    box-sizing: border-box !important;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    /* 🌟 FIX: Padding ko 100px se ghata kar sirf 70px kiya jo floating footer ke liye kafi hai */
+    padding: 0 0 70px 0; 
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
 }
+
 
 .cart-item-card {
     display: flex !important;
@@ -784,10 +768,11 @@ input:checked + .toggle-slider:before {
     max-width: 50%; /* Text out-of-bound na ho */
 }
 
+/* CORRECTION: Synchronized with home page typography specs */
 .cart-item-name {
-    font-weight: 700;
-    font-size: 15px;
-    color: #0f172a;
+    font-weight: 600; /* 🌟 Font weight 700 se 600 kiya (Same as Home Page) */
+    font-size: 14.5px; /* Size balance matching */
+    color: #1e293b; /* Pure Slate color mapping */
     text-transform: capitalize;
 }
 
@@ -1208,121 +1193,10 @@ input:checked + .toggle-slider:before {
 }
 
 
-.main-content-area {
-    /* 🔑 FIX 1: Flex context define kiya taaki height calculations automate hon */
-    flex: 1; 
-    width: 100%;
-    max-width: 100%;
-    
-    /* 🔑 FIX 2: Height: 100% ko badal kar 'scroll-viewport' control lock kiya.
-       Yeh browser ko batayega ki agar cards screen se bahar jayein toh scroll bars activate karo! */
-    height: calc(100vh - 106px); 
-    
-    overflow-y: auto !important; /* Forces native touch-scrolling activation */
-    -webkit-overflow-scrolling: touch; /* Mobile Smooth inertial scrolling momentum */
-    
-    /* 🧽 Side spaces zero kiye edge-to-edge continuity ke liye, top par smooth border line backup rakhi */
-    padding: 0px 0px 100px 0px !important; 
-    gap: 0px !important; /* Elements ke beech ka unwanted vertical gap completely clear */
 
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-    position: relative;
-    
-    /* Hide Scrollbars completely */
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
 
-.main-content-area::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
-}
 
-/* ==========================================================================
-   --- 📦 FLAT MINIMALIST INVENTORY CARD GRID (style.css) ---
-   ========================================================================== */
-.inventory-card {
-    background: #ffffff !important;
-    display: flex !important;
-    align-items: center !important; 
-    justify-content: space-between !important;
-    position: relative !important;
-    width: 100% !important;
-    flex-shrink: 0 !important;
-    box-sizing: border-box !important;
-    
-    /* 📏 FIXED IDENTICAL DIMENSION LOCK: Cart card se 100% match karega */
-    height: 64px !important;
-    min-height: 64px !important;
-    max-height: 64px !important;
-    
-    /* 🧽 VISUAL CLEAN REWIPE: Border, Shadow, aur Radius sab hataya */
-    border: none !important;
-    border-radius: 0 !important;
-  /*  border-bottom: 1px solid #f1f5f9 !important;  Soft minimal row divider line */
-    padding: 0 16px !important; /* Proper internal side padding */
-    
-    /* 🚀 HARDWARE ACCELERATION STABLE FOR SMOOTH SCROLL */
-    -webkit-backface-visibility: hidden !important;
-    backface-visibility: hidden !important;
-    -webkit-perspective: 1000px !important;
-    perspective: 1000px !important; 
-    -webkit-transform: translate3d(0, 0, 0) !important;
-    transform: translate3d(0, 0, 0) !important; 
-    will-change: background-color;
-    
-    transition: background-color 0.15s ease !important;
-}
 
-/* Active touch pressure micro scale state adjustments */
-.inventory-card:active {
-    transform: none !important; /* Scale effects ko block kiya flat texture matching ke liye */
-    background-color: #f8fafc !important;
-}
-
-/* Selected item configuration layout updates */
-.inventory-card.selected-card {
-    background: #f5f3ff !important; /* Soft dynamic indicator background tint on selection mode */
-   /* border-bottom: 1px solid #ddd6fe !important;*/
-}
-
-/* ==========================================================================
-   --- 📦 CORE EDGE-TO-EDGE INVENTORY CARD FIXED (style.css) ---
-   ========================================================================== */
-.inventory-card {
-    background: #ffffff !important;
-    display: flex !important;
-    align-items: center !important; 
-    justify-content: space-between !important;
-    position: relative !important;
-    width: 100% !important;
-    flex-shrink: 0 !important;
-    box-sizing: border-box !important;
-    
-    /* 📏 FIXED GEOMETRY */
-    height: 64px !important;
-    min-height: 64px !important;
-    max-height: 64px !important;
-    
-    /* 🧽 VISUAL RESET: Complete Border aur Radius Removal */
-    border: none !important;
-    border-radius: 0px !important;
-    border-bottom: 1px solid #f1f5f9 !important; /* Elegant divider line */
-    padding: 0 16px !important;
-    
-    /* PERFORMANCE ISOLATION FOR MOBILE ENGINE */
-    -webkit-backface-visibility: hidden !important;
-    backface-visibility: hidden !important;
-    -webkit-perspective: 1000px !important;
-    perspective: 1000px !important; 
-    -webkit-transform: translate3d(0, 0, 0) !important;
-    transform: translate3d(0, 0, 0) !important; 
-    
-    transition: background-color 0.15s ease !important;
-}
 
 /* 🪙 THE COIN WRAPPER: Optimized with Layer Pre-rendering hints */
 .card-icon-wrapper {
@@ -1344,12 +1218,106 @@ input:checked + .toggle-slider:before {
     transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important; 
 }
 
+.main-content-area {
+    flex: 1; 
+    width: 100%;
+    max-width: 100%;
+    height: calc(100vh - 106px); 
+    overflow-y: auto !important; 
+    -webkit-overflow-scrolling: touch; 
+    /* 🌟 FIX: Yahan bhi excessive 100px padding ko optimize karke 75px clean cusion kiya */
+    padding: 0px 0px 75px 0px !important; 
+    gap: 0px !important; 
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    position: relative;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+
+.main-content-area::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+.inventory-card {
+    background: #ffffff !important;
+    display: flex !important;
+    align-items: center !important; 
+    justify-content: space-between !important;
+    position: relative !important;
+    width: 100% !important;
+    flex-shrink: 0 !important;
+    box-sizing: border-box !important;
+    
+    /* 📏 FIXED GEOMETRY */
+    height: 64px !important;
+    min-height: 64px !important;
+    max-height: 64px !important;
+    
+    /* 🧽 VISUAL FLAT CLEANUP */
+    border: none !important;
+    border-radius: 0px !important;
+    border-bottom: 1px solid #f1f5f9 !important; 
+    padding: 0 16px !important;
+    
+    /* PERFORMANCE ISOLATION FOR MOBILE ENGINE */
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+    -webkit-perspective: 1000px !important;
+    perspective: 1000px !important; 
+    -webkit-transform: translate3d(0, 0, 0) !important;
+    transform: translate3d(0, 0, 0) !important; 
+    
+    transition: background-color 0.15s ease !important;
+}
+
+/* Active touch state response */
+.inventory-card:active {
+    transform: none !important; 
+    background-color: #f8fafc !important;
+}
+
+/* Selected state layout styling indicator */
+.inventory-card.selected-card {
+    background: #e6f4f5 !important; /* Premium brand micro teal background tint */
+    border-bottom: 1px solid #bce2e4 !important;
+}
+
+/* Flip Back-Face Badge Sync */
+.selection-tick-overlay {
+    position: absolute !important;
+    top: 0 !important; left: 0 !important;
+    width: 24px !important;  
+    height: 24px !important; 
+    
+    /* 🌟 THEME FIX: Purane light blue ko badalkar real accent cyan color fill diya */
+    background: var(--accent-cyan) !important; 
+    color: #ffffff !important; /* Sharp contrast display checkmark node */
+    border: 1px solid rgba(42, 187, 155, 0.4) !important; 
+    
+    font-size: 11px !important; 
+    font-weight: 900 !important;
+    border-radius: 50% !important; 
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    backface-visibility: hidden !important;
+    -webkit-backface-visibility: hidden !important;
+    transform: rotateY(180deg) !important;
+    z-index: 1 !important;
+    box-shadow: 0 2px 8px rgba(42, 187, 155, 0.25) !important; /* Teal visual drop shadow glow */
+}
+
+
 /* 🔄 FLIP STATE: Card select hote hi wrapper smoothly 180deg Y-axis par flip ho jayega */
 .inventory-card.selected-card .card-icon-wrapper {
     transform: rotateY(180deg) !important;
 }
 
-/* Front Face */
 .custom-type-icon {
     width: 24px !important;
     height: 24px !important;
@@ -1360,28 +1328,7 @@ input:checked + .toggle-slider:before {
     z-index: 2 !important;
 }
 
-/* Back Face */
-.selection-tick-overlay {
-    position: absolute !important;
-    top: 0 !important; left: 0 !important;
-    width: 24px !important;  
-    height: 24px !important; 
-    background: #e0e7ff !important; /* Soft Premium Light Indigo */
-    color: var(--primary) !important; /* Deep Indigo text */
-    border: 1px solid #c7d2fe !important; 
-    font-size: 11px !important; 
-    font-weight: 900 !important;
-    border-radius: 50% !important; 
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    backface-visibility: hidden !important; /* */
-    -webkit-backface-visibility: hidden !important;
-    transform: rotateY(180deg) !important; /* */
-    z-index: 1 !important;
-}
 
-/* 🔑 FIRST-TIME POP ACTION: Toolbar icons par animation tabhi chalega jab toolbar pehli baar .first-load ke sath khulega */
 .selection-toolbar-overlay.first-load .sel-btn {
     animation: toolbarIconPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
@@ -1974,3 +1921,193 @@ input:checked + .toggle-slider:before {
     box-sizing: border-box !important;
     flex-shrink: 0 !important;
 }
+
+/* ==========================================================================
+   --- 📱 COMPACT PROFESSIONAL PREVIEW GRID (NO FORCED ACCORDION STRETCH) ---
+   ========================================================================== */
+
+/* Main Container: Native scrolling restore karne ke liye flex se grid matrix me shift kiya */
+#preview-content-area {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Strict side-by-side pair */
+    gap: 0px; /* Professional micro gap rows aur columns dono me */
+    padding: 0px;
+    align-content: start; /* 🌟 Critical Fix: Cards ko upar hi tightly pack rakhega, niche khinchega nahi */
+    overflow-y: auto; /* Clean scrolling engine enable kiya */
+    -webkit-overflow-scrolling: touch;
+    height: calc(100vh - 60px); 
+    box-sizing: border-box;
+}
+
+/* Individual Item Box Card */
+.group-preview-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0;
+    margin: 5px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.02);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: max-content; /* 🌟 Critical Fix: Card utni hi height lega jitni badi canvas image hai, faltu space zero */
+    box-sizing: border-box;
+}
+
+/* Image Wrapper Layout */
+.preview-card-image-wrapper {
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    display: block;
+}
+
+.preview-card-image-wrapper img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+}
+
+/* Horizontal Action Row over the Image layer */
+.preview-card-floating-actions {
+    position: absolute;
+    top: -8px; /* Smooth edge mapping */
+    right: 8px;
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    z-index: 10;
+}
+
+/* Rounded Action Badge Button */
+.preview-action-icon-btn {
+    background: #ffffff; 
+    border: 1px solid #cbd5e1;
+    color: #475569; 
+    width: 26px; /* Optimized compact size */
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 3px 6px rgba(15, 23, 42, 0.1);
+    transition: all 0.15s ease;
+    outline: none;
+    padding: 0;
+}
+
+.preview-action-icon-btn:active {
+    transform: scale(0.9);
+}
+
+/* WhatsApp Brand Custom Fill Color */
+.preview-action-icon-btn.wa-share {
+    color: #ffffff;
+    background: #25D366; 
+    border-color: #1ebd59;
+}
+
+.preview-action-icon-btn.wa-share:active {
+    background: #1ebd59;
+}
+
+/* Download Native Custom Fill Color */
+.preview-action-icon-btn.dl-png {
+    color: var(--primary);
+    border-color: #c7d2fe;
+}
+
+.preview-action-icon-btn.dl-png:active {
+    background: #eff6ff;
+}
+
+.preview-action-icon-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+
+.preview-zoom-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    
+    /* 🌟 CHANGE: Heavy dark solid block se hatakar sirf 30% alpha opacity di */
+    background-color: rgba(15, 23, 42, 0.3); 
+    
+    /* Safe glass blur layer tracking */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    
+    display: none; 
+    align-items: center;
+    justify-content: center;
+    z-index: 9999999; 
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+
+.preview-zoom-overlay.active {
+    display: flex;
+    opacity: 1;
+}
+
+/* Close action circular float badge */
+.zoom-close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 10;
+    transition: transform 0.1s;
+}
+
+.zoom-close-btn:active {
+    transform: scale(0.85);
+}
+
+.zoom-close-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Zoom Image Scroll viewport wrapper frame */
+.zoom-viewport-container {
+    width: 100%;
+    height: 100%;
+    overflow: auto; /* Multi-directional touch scrolling mapping */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+
+/* Custom changes to lock manual scale alterations */
+.zoom-viewport-container img {
+    max-width: 95%;
+    max-height: 90%;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    cursor: default; 
+    user-select: none;
+    pointer-events: none; 
+}
+

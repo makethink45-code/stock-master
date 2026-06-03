@@ -408,9 +408,7 @@ function getEmptyStateHTML() {
 
 function generateCartPreview() {
     const cart = getCartItems();
-    // Upgraded clean reference:
     const inventory = getActiveInventory();
-
     const keys = Object.keys(cart);
 
     if (keys.length === 0) {
@@ -427,48 +425,116 @@ function generateCartPreview() {
         groupedCart[root].push({ cartKey: key, ...item });
     });
 
-    // 2. TARGET CHANGE: Ab Cart body me nahi, naye Preview section me data load hoga
     const previewContentArea = document.getElementById('preview-content-area');
     if (!previewContentArea) return;
 
     previewContentArea.innerHTML = ""; 
 
-    // 🔑 FIXED STATE 1: Helper utility function ko loop shuru hone se pehle top par daldia taaki scope errors na aayein
-    function appendPreviewCardToDOM(imgURL, rootName) {
+    // 🚀 INITIALIZE GLOBAL MATRIX ENHANCEMENTS & CONSTANTS
+    const dpr = Math.max(window.devicePixelRatio || 1, 2); 
+    const rowHeight = 40;       
+    const headerHeight = 85;    
+    const displayWidth = 450;    
+    const displayHeight = 600; 
+
+    // Inline Layout Definition Helper (🌟 Dynamic Keys Integration)
+  /*  function appendPreviewCardToDOM(imgURL, rootName, itemKeysList) {
+        const downloadSVG = `
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+        `;
+        
+        const whatsappSVG = `
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+            </svg>
+        `;
+
+        const encodedText = encodeURIComponent(`🚨 *New WayStock Order Preview*\nCategory Group: *${rootName}*\nPhoto slip generated via app registry. Please check image attachment! 🚀`);
+        const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
+
+        // 🌟 KEY LOCK MATRIX: Keys array ko stringified karke dynamic function injection me save kiya
+        const serializedKeys = encodeURIComponent(JSON.stringify(itemKeysList));
+
         const previewCard = document.createElement('div'); 
         previewCard.className = "group-preview-card"; 
-        previewCard.style = "width: calc(100% - 32px); max-width: 450px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; margin: 0 auto 16px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.02);"; 
         
         previewCard.innerHTML = `
-            <div style="width: 100%; overflow: hidden; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 12px;">
-                <img src="${imgURL}" style="width: 100%; display: block;" alt="Order Group Image">
+            <div class="preview-card-floating-actions">
+                <button onclick="shareGroupImage('${imgURL}', '${rootName}')" class="preview-action-icon-btn wa-share" title="Share via WhatsApp">
+                    ${whatsappSVG}
+                </button>
+                <button onclick="downloadGroupImage('${imgURL}', '${rootName}', '${serializedKeys}')" class="preview-action-icon-btn dl-png" title="Download PNG Picture">
+                    ${downloadSVG}
+                </button>
             </div>
-            <div style="display: flex; gap: 8px;">
-                <button onclick="downloadGroupImage('${imgURL}', '${rootName}')" style="flex: 1; height: 40px; background: #2563eb; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;">📥 Download PNG</button>
+            <div class="preview-card-image-wrapper">
+                <img src="${imgURL}" alt="${rootName} Order Image Preview">
             </div>
         `; 
         previewContentArea.appendChild(previewCard);
+    }*/
+
+    // Inline Layout Definition Helper (🌟 Integrated Targeted Array Keys for Both Actions)
+    function appendPreviewCardToDOM(imgURL, rootName, itemKeysList) {
+        const downloadSVG = `
+    <svg viewBox="0 0 24 24" stroke="var(--primary)" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+`;
+
+        
+        const whatsappSVG = `
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+            </svg>
+        `;
+
+        // 🔒 KEY LOCK MATRIX: Same serialization applied to keep both logic threads synchronized
+        const serializedKeys = encodeURIComponent(JSON.stringify(itemKeysList));
+
+        const previewCard = document.createElement('div'); 
+        previewCard.className = "group-preview-card"; 
+        
+        previewCard.innerHTML = `
+            <div class="preview-card-floating-actions">
+                <!-- 🌟 FIXED: Pass encrypted layout keys straight into the native app sharer engine -->
+                <button onclick="shareGroupImage('${imgURL}', '${rootName}', '${serializedKeys}')" class="preview-action-icon-btn wa-share" title="Share via WhatsApp">
+                    ${whatsappSVG}
+                </button>
+                <button onclick="downloadGroupImage('${imgURL}', '${rootName}', '${serializedKeys}')" class="preview-action-icon-btn dl-png" title="Download PNG Picture">
+                    ${downloadSVG}
+                </button>
+            </div>
+<div class="preview-card-image-wrapper">
+    <img src="${imgURL}" onclick="openInteractiveZoomView('${imgURL}')" style="cursor:zoom-in;" alt="${rootName} Order Image Preview">
+</div>      `; 
+        previewContentArea.appendChild(previewCard);
     }
-    
+
     // Main formatting loop wrapper block
     Object.keys(groupedCart).forEach((rootName) => {
-        const items = groupedCart[rootName]; //
-        
-        // --- HIGH-CONTRAST CLEAN SOBER DIMENSIONS (FIXED HEIGHT INTEGRATION) ---
-        const rowHeight = 40;       
-        const headerHeight = 85;    
-        const footerHeight = 40;    
-        const canvasWidth = 450;    
-        const canvasHeight = 600; // 📏 Fixed bounding size to control memory allocation safely
+        const items = groupedCart[rootName]; 
+        const maxParts = Math.ceil(items.length / 11);
 
-        const canvas = document.createElement('canvas'); //
-        canvas.width = canvasWidth; //
-        canvas.height = canvasHeight; //
-        const ctx = canvas.getContext('2d'); //
+        // Canvas element template setup block
+        let canvas = document.createElement('canvas'); 
+        canvas.width = displayWidth * dpr; 
+        canvas.height = displayHeight * dpr; 
+        canvas.style.width = displayWidth + "px";
+        canvas.style.height = displayHeight + "px";
+
+        let ctx = canvas.getContext('2d'); 
+        ctx.scale(dpr, dpr); 
 
         // Pure Clean White Base
-        ctx.fillStyle = "#ffffff"; //
-        ctx.fillRect(0, 0, canvasWidth, canvasHeight); //
+        ctx.fillStyle = "#ffffff"; 
+        ctx.fillRect(0, 0, displayWidth, displayHeight); 
 
         // --- MINIMALIST TEXT HEADER ---
         ctx.fillStyle = "#0f172a"; 
@@ -479,8 +545,7 @@ function generateCartPreview() {
         // Metadata Sub-line with calculated dynamic part indicators
         ctx.fillStyle = "#64748b";
         ctx.font = "12px ui-monospace, monospace";
-        const maxParts = Math.ceil(items.length / 11);
-        const totalItemsText = "Total Items: " + items.length + " | Part: 1/" + maxParts + " | " + new Date().toLocaleDateString('en-GB');
+        let totalItemsText = "Total Items: " + items.length + " | Part: 1/" + maxParts + " | " + new Date().toLocaleDateString('en-GB');
         ctx.fillText(totalItemsText, 20, 60);
 
         // Top Thick Divider Line
@@ -488,14 +553,15 @@ function generateCartPreview() {
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(20, 72);
-        ctx.lineTo(canvasWidth - 20, 72);
+        ctx.lineTo(displayWidth - 20, 72); 
         ctx.stroke();
 
         let currentY = headerHeight + 20;
-
-        // Active context layer memory points
         let activeCanvas = canvas;
         let activeCtx = ctx;
+        
+        // 🌟 CURRENT TRACKER ARRAY: Jo is sheet par load ho rahe items ki tracking karega
+        let activeSheetKeys = [];
 
         // Inside Loop: Rows Layout Design with smart auto-slicing logic built-in
         items.forEach((item, idx) => {
@@ -506,27 +572,34 @@ function generateCartPreview() {
                 activeCtx.strokeStyle = "#94a3b8"; 
                 activeCtx.lineWidth = 1;
                 activeCtx.beginPath();
-                activeCtx.moveTo(20, canvasHeight - 32);
-                activeCtx.lineTo(canvasWidth - 20, canvasHeight - 32);
+                activeCtx.moveTo(20, displayHeight - 32); 
+                activeCtx.lineTo(displayWidth - 20, displayHeight - 32); 
                 activeCtx.stroke();
                 activeCtx.textAlign = "left";
                 activeCtx.fillStyle = "#94a3b8";
                 activeCtx.font = "10px ui-monospace, monospace";
-                activeCtx.fillText("Generated via WayStock Master", 20, canvasHeight - 15);
+                activeCtx.fillText("Generated via WayStock Master", 20, displayHeight - 15); 
                 activeCtx.textAlign = "right";
-                activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), canvasWidth - 20, canvasHeight - 15);
+                activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), displayWidth - 20, displayHeight - 15); 
 
                 const partialImgURL = activeCanvas.toDataURL("image/png");
-                appendPreviewCardToDOM(partialImgURL, rootName);
+                
+                // 🌟 PASS ENGINE: Purani sheet ke tracked items pass karo aur reset karo
+                appendPreviewCardToDOM(partialImgURL, rootName, activeSheetKeys);
+                activeSheetKeys = [];
 
-                // Re-instantiate next canvas sheet dynamically
+                // CONT. CANVAS RECREATION CORRECTION
                 activeCanvas = document.createElement('canvas');
-                activeCanvas.width = canvasWidth;
-                activeCanvas.height = canvasHeight;
+                activeCanvas.width = displayWidth * dpr;
+                activeCanvas.height = displayHeight * dpr;
+                activeCanvas.style.width = displayWidth + "px";
+                activeCanvas.style.height = displayHeight + "px";
+
                 activeCtx = activeCanvas.getContext('2d');
+                activeCtx.scale(dpr, dpr);
 
                 activeCtx.fillStyle = "#ffffff";
-                activeCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+                activeCtx.fillRect(0, 0, displayWidth, displayHeight);
 
                 activeCtx.fillStyle = "#0f172a"; 
                 activeCtx.font = "bold 20px ui-monospace, monospace";
@@ -542,25 +615,27 @@ function generateCartPreview() {
                 activeCtx.lineWidth = 2;
                 activeCtx.beginPath();
                 activeCtx.moveTo(20, 72);
-                activeCtx.lineTo(canvasWidth - 20, 72);
+                activeCtx.lineTo(displayWidth - 20, 72);
                 activeCtx.stroke();
 
-                currentY = headerHeight + 20; // reset pointer to upper bounds
+                currentY = headerHeight + 20; 
             }
 
-            let finalNameToShow = item.name; //
-            const pathParts = item.cartKey.split('>'); //
-            if (pathParts.length > 1) { //
-                pathParts.pop(); //
-                const parentKey = pathParts.join('>').trim(); //
-                const parentData = inventory[parentKey]; //
-                if (parentData && parentData.toggleOn === true) { //
-                    const parentName = parentData.name || parentKey.split('>').pop().trim(); //
-                    finalNameToShow = parentName + " " + item.name; //
+            // 🌟 TRACK KEY: Is item ki main cart storage key ko array me daal lo
+            activeSheetKeys.push(item.cartKey);
+
+            let finalNameToShow = item.name; 
+            const pathParts = item.cartKey.split('>'); 
+            if (pathParts.length > 1) { 
+                pathParts.pop(); 
+                const parentKey = pathParts.join('>').trim(); 
+                const parentData = inventory[parentKey]; 
+                if (parentData && parentData.toggleOn === true) { 
+                    const parentName = parentData.name || parentKey.split('>').pop().trim(); 
+                    finalNameToShow = parentName + " " + item.name; 
                 }
             }
 
-            // Text layout adjustments mapping to active stream context
             activeCtx.textAlign = "left";
             activeCtx.fillStyle = "#1e293b"; 
             activeCtx.font = "500 14px ui-monospace, monospace";
@@ -572,38 +647,103 @@ function generateCartPreview() {
             const finalUnitText = item.unit ? " " + item.unit : "";
             const qtyText = item.quantity + finalUnitText; 
             
-            activeCtx.fillText(qtyText, canvasWidth - 20, currentY); //
+            activeCtx.fillText(qtyText, displayWidth - 20, currentY); 
 
             activeCtx.strokeStyle = "#e2e8f0"; 
-            activeCtx.lineWidth = 1; //
-            activeCtx.beginPath(); //
-            activeCtx.moveTo(20, currentY + 12); //
-            activeCtx.lineTo(canvasWidth - 20, currentY + 12); //
-            activeCtx.stroke(); //
+            activeCtx.lineWidth = 1; 
+            activeCtx.beginPath(); 
+            activeCtx.moveTo(20, currentY + 12); 
+            activeCtx.lineTo(displayWidth - 20, currentY + 12); 
+            activeCtx.stroke(); 
 
-            currentY += rowHeight; //
+            currentY += rowHeight; 
         });
 
-        // 🔑 FIXED STATE 2: Loop complete hone par aakhiri/bache huye elements ka closure draw karna
+        // Final closure draw for remaining items on last page sheet
         activeCtx.strokeStyle = "#94a3b8"; 
         activeCtx.lineWidth = 1;
         activeCtx.beginPath();
-        activeCtx.moveTo(20, canvasHeight - 32);
-        activeCtx.lineTo(canvasWidth - 20, canvasHeight - 32);
+        activeCtx.moveTo(20, displayHeight - 32); 
+        activeCtx.lineTo(displayWidth - 20, displayHeight - 32); 
         activeCtx.stroke();
         activeCtx.textAlign = "left";
         activeCtx.fillStyle = "#94a3b8";
         activeCtx.font = "10px ui-monospace, monospace";
-        activeCtx.fillText("Generated via WayStock Master", 20, canvasHeight - 15);
+        activeCtx.fillText("Generated via WayStock Master", 20, displayHeight - 15); 
         activeCtx.textAlign = "right";
-        activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), canvasWidth - 20, canvasHeight - 15);
+        activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), displayWidth - 20, displayHeight - 15); 
 
-        const imgURL = activeCanvas.toDataURL("image/png"); //
-        appendPreviewCardToDOM(imgURL, rootName);
+        const imgURL = activeCanvas.toDataURL("image/png"); 
+        
+        // 🌟 FINAL SHEET POP ENGINE
+        appendPreviewCardToDOM(imgURL, rootName, activeSheetKeys);
     });
 
     if (typeof openOverlay === 'function') {
         openOverlay('preview');
+    }
+}
+
+// ==========================================================================
+// --- 📱 SMART TARGETED IMAGE WHATSAPP SHARER & ROUTE WATCHER ---
+// ==========================================================================
+async function shareGroupImage(dataURL, folderName, encodedKeysList) {
+    try {
+        const response = await fetch(dataURL);
+        const blob = await response.blob();
+        const safeFileName = `WayStock_${folderName.replaceAll(" ", "_")}.png`;
+        const file = new File([blob], safeFileName, { type: "image/png" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: `${folderName} Order Slip`,
+                text: `🚨 *WayStock Order Preview*\nCategory Group: *${folderName}*\nPhoto slip attached safely! 🚀`
+            });
+
+            // 🌟 ATOMIC TARGETED CLEAN ENGINE (Same as Download Logic)
+            const cartKey = getCartStorageKey();
+            let cart = getCartItems();
+
+            if (encodedKeysList) {
+                const targetKeysToFlush = JSON.parse(decodeURIComponent(encodedKeysList));
+                if (Array.isArray(targetKeysToFlush)) {
+                    targetKeysToFlush.forEach(key => {
+                        if (cart[key]) delete cart[key];
+                    });
+                }
+            }
+            localStorage.setItem(cartKey, JSON.stringify(cart));
+            showAlert(`✅ Slip ka maal share hone par bucket se saaf ho gaya hai.`, "success");
+
+            if (typeof renderCartContent === "function") renderCartContent();
+            if (typeof refreshUI === "function") refreshUI();
+
+            // 🌟 DYNAMIC AUTOMATIC SHIFT POP CHECKER (Smart Navigation Router)
+            const previewContentArea = document.getElementById('preview-content-area');
+            const totalRemainingSlips = previewContentArea ? previewContentArea.querySelectorAll('.group-preview-card').length : 0;
+
+            // Agar sabhi sheet images download/share ho chuki hain (0 left or only 1 left which is currently being popped), move back
+            if (totalRemainingSlips <= 1) {
+                window.history.back(); // Direct shift back to My Cart view screen
+            } else {
+                // Background me sirf current card slip container layout ko clear karo
+                // Is tarah screen pop hilegi nahi aur user bache hue cards download kar payega
+                if (previewContentArea) {
+                    const cards = previewContentArea.querySelectorAll('.group-preview-card');
+                    cards.forEach(card => {
+                        if (card.innerHTML.includes(`downloadGroupImage('${dataURL}'`) || card.innerHTML.includes(`shareGroupImage('${dataURL}'`)) {
+                            card.remove(); // Safely clears shared sheet from screen structure matrix
+                        }
+                    });
+                }
+            }
+
+        } else {
+            showAlert("Apka device direct image sharing support nahi karta. Please download karke share karein! 📥", "error");
+        }
+    } catch (error) {
+        console.error("Direct share interaction aborted or crashed:", error);
     }
 }
 
@@ -778,8 +918,16 @@ window.onpopstate = function(event) {
         recognition.stop();
     }
     const state = event.state;
-    
-    // 🔑 FIX 2: Jab bhi back button dabakar screen pop ho, toh header se search-active state instantly saaf karo!
+    if (document.getElementById('preview-zoom-overlay')?.classList.contains('active')) {
+        closeInteractiveZoomView(true); // true means history text pop trigger pass parameters safely
+        return; // Event chain terminate
+    }
+    if (window.WayStockAdminState && window.WayStockAdminState.isSelectionMode) {
+        if (typeof exitSelectionMode === 'function') {
+            exitSelectionMode(true); // Exits mode without creating dynamic history routing loops
+            return; 
+        }
+    }
     document.querySelector('.main-header')?.classList.remove('search-active');
 
     if (window.isSelectionMode) {
@@ -807,7 +955,8 @@ window.onpopstate = function(event) {
             if (typeof renderCartContent === "function") renderCartContent();
         } else if (state.overlay === 'search') {
             document.getElementById('search-section')?.classList.add('active');
-            document.getElementById('breadcrumb-section')?.幕classList.add('hidden');
+            // CORRECTION:
+document.getElementById('breadcrumb-section')?.classList.add('hidden');
             // Re-apply if moving back into search state frame
             document.querySelector('.main-header')?.classList.add('search-active');
         } else if (state.overlay === 'setting') {
@@ -916,7 +1065,7 @@ function renderCartContent() {
     if (cartFooter) cartFooter.style.display = 'flex';
     if (cartCount) cartCount.innerText = keys.length;
 
-    let listHTML = `<div class="cart-items-list" style="width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 10px 0;">`;
+    let listHTML = `<div class="cart-items-list">`;
 
     // 🔑 DETECT PAGE TYPE CONTEXT FOR CROSS LAYOUT MANAGEMENT
     const isCurrentPageAdmin = window.location.pathname.includes('admin.html');
@@ -1004,7 +1153,7 @@ function renderCartContent() {
             <div class="cart-item-card" style="display: flex; align-items: center; justify-content: space-between; background: #ffffff;height: 68px; box-sizing: border-box;">
                 
                 <div class="cart-item-info" style="display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 0; padding-right: 8px;">
-                    <span class="cart-item-name" style="font-weight: 700; font-size: 14px; color: #0f172a; text-transform: capitalize; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; display: block;">
+                    <span class="cart-item-name"; text-transform: capitalize; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; display: block;">
                         ${finalNameToShow}
                     </span> 
                 </div>
@@ -1671,7 +1820,8 @@ function clearCompleteCart() {
     }
 }
 
-function downloadGroupImage(dataURL, folderName) {
+
+function downloadGroupImage(dataURL, folderName, encodedKeysList) {
     const link = document.createElement('a');
     link.download = "WayStock_" + folderName.replaceAll(" ", "_") + ".png";
     link.href = dataURL;
@@ -1682,38 +1832,49 @@ function downloadGroupImage(dataURL, folderName) {
 
     const cartKey = getCartStorageKey();
     let cart = getCartItems();
-    Object.keys(cart).forEach(key => {
-        if (cart[key].rootFolder === folderName) {
-            delete cart[key];
+
+    // 🌟 ATOMIC CLEAN ENGINE: Purane pure category flush ko lock karke specific filter check kiya
+    if (encodedKeysList) {
+        try {
+            // Stringified data ko transparently back array process logic me restore kiya
+            const targetKeysToFlush = JSON.parse(decodeURIComponent(encodedKeysList));
+            
+            if (Array.isArray(targetKeysToFlush)) {
+                targetKeysToFlush.forEach(key => {
+                    if (cart[key]) {
+                        delete cart[key]; // 🔥 Sirf wahi item uda jo download hua!
+                    }
+                });
+                console.log(`🎯 [Clean Engine] Atomic removal complete for sheet items.`, targetKeysToFlush);
+            }
+        } catch (e) {
+            console.error("Targeted parsing clean stack collapsed:", e);
         }
-    });
+    } else {
+        // Safe Layout Fallback: Agar upar se array na mile (Light protection layer)
+        Object.keys(cart).forEach(key => {
+            if (cart[key].rootFolder === folderName) {
+                delete cart[key];
+            }
+        });
+    }
+
+    // Save atomic snapshot state downstream
+    // ... downloadGroupImage logic ke upar ka saara code safe rahega ...
     localStorage.setItem(cartKey, JSON.stringify(cart));
-    
-    showAlert(`✅ ${folderName} ka maal bucket se saaf ho gaya hai.`, "success");
+    showAlert(`✅ Slip ka maal bucket se saaf ho gaya hai.`, "success");
 
-    // ==========================================================================
-    // --- 📥 🔥 IMAGE DOWNLOAD PUSH NOTIFICATION TRIGGER ENGINE ---
-    // ==========================================================================
-        // window.Notification check lagane se browser crash nahi hoga aur framework safe rahega
-if (window.Notification && Notification.permission === 'granted') {
-
-        // 🔊 LIVE CUSTOM AUDIO PLAYER CORE
+    if (window.Notification && Notification.permission === 'granted') {
         const alertSound = new Audio('./notification-sound.wav');
-        alertSound.play().catch(e => console.log("Audio play blocked by browser policy until interaction"));
+        alertSound.play().catch(e => console.log("Audio play blocked"));
 
         navigator.serviceWorker.ready.then(registration => {
             registration.showNotification('Order Saved Successfully! 💾', {
                 body: `${folderName} ki order image download ho gayi he.`,
-                icon: 'logo.png', // Aapka brand logo
+                icon: 'logo.png',
                 badge: 'logo.png',
-                
-                // 🔊 SOUND LOCK: Standard web api ke mutabik default notification sound play hoga
-                // (Kuch mobile devices me ye notification channel settings ke sound par depend karta he)
                 sound: 'default', 
-                
-                // ⚡ HEAVY VIBRATION PATTERN: Sound ke sath phone shandar tarike se buzz hoga
                 vibrate: [100, 50, 100, 200, 100, 200], 
-                
                 tag: 'download-success',
                 renotify: true
             });
@@ -1722,8 +1883,28 @@ if (window.Notification && Notification.permission === 'granted') {
 
     if (typeof renderCartContent === "function") renderCartContent();
     if (typeof refreshUI === "function") refreshUI();
-    window.history.back();
+
+    // 🌟 DYNAMIC ROUTE POP CONTROL MATRIX (Smart Checker Configuration)
+    const previewContentArea = document.getElementById('preview-content-area');
+    const totalRemainingSlips = previewContentArea ? previewContentArea.querySelectorAll('.group-preview-card').length : 0;
+
+    if (totalRemainingSlips <= 1) {
+        // Safe Mode Trigger: Agar ye aakhiri box bacha hua tha screen par, tabhi piche le jao!
+        window.history.back(); 
+    } else {
+        // Stay On Screen Mode: Downloaded card layout element box ko dynamic window surface se dissolve kardo
+        if (previewContentArea) {
+            const cards = previewContentArea.querySelectorAll('.group-preview-card');
+            cards.forEach(card => {
+                // Direct current image signature verification check
+                if (card.innerHTML.includes(`downloadGroupImage('${dataURL}'`)) {
+                    card.remove(); // Remove downloaded box element without moving the layout window back!
+                }
+            });
+        }
+    }
 }
+
 
 
 db.collection("appSettings").doc("globalNotification").onSnapshot((doc) => {
@@ -2015,11 +2196,35 @@ function commitQuantityToStorage(key, finalQty) {
     }
 }
 
-// ==========================================================================
-// --- 🔽 CENTRAL ADAPTIVE UNIT ENGINE UTILITIES (common.js) ---
-// ==========================================================================
+function openInteractiveZoomView(imageSrc) {
+    const overlay = document.getElementById('preview-zoom-overlay');
+    const targetImg = document.getElementById('zoom-target-image');
+    
+    if (!overlay || !targetImg) return;
+    
+    targetImg.src = imageSrc;
+    overlay.classList.add('active'); 
 
-// Simple global toggle selector helper
+    // SYSTEM BACK LOCK: History state stack lock karo taaki hardware back key capture ho sake
+    if (window.history.state?.overlay !== 'preview-zoom') {
+        history.pushState({ overlay: 'preview-zoom' }, "");
+    }
+}
+
+function closeInteractiveZoomView(isBackAction = false) {
+    const overlay = document.getElementById('preview-zoom-overlay');
+    if (!overlay) return;
+
+    overlay.classList.remove('active');
+
+    // ROUTING SAFETY RESET: Agar user ne × button dabaya he, toh background history stack pop karo
+    if (!isBackAction && window.history.state?.overlay === 'preview-zoom') {
+        window.history.back();
+    }
+}
+
+
+
 function toggleUnitDropdownMenu(element) {
     const parentWrapper = element.closest('.unit-dropdown-wrapper');
     const targetDropdown = parentWrapper?.querySelector('.unit-select-dropdown');
@@ -2062,7 +2267,7 @@ function executeUnitSelectChange(key, unitValue, pageType) {
     refreshUI();
 }
 
-// 🔑 ADMIN INPUT TRIGGER INTERCEPTOR (ENTER PRESS KEY CODE)
+// REPLACE WITH THIS CLEAN LOGIC:
 function handleAdminUnitEnter(event, key) {
     if (event.key !== 'Enter') return;
     event.preventDefault();
@@ -2076,21 +2281,22 @@ function handleAdminUnitEnter(event, key) {
     let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
     if (!inventory[key]) return;
 
-    // Extract Root Parent Category path key segment matching rules configurations
+    // Extract Root Parent Category path key segment
     const topRootParentCategoryKey = key.includes('>') ? key.split('>')[0].trim() : key;
 
     console.log(`🚀 [Unit Engine] Propagating option "${formattedUnit}" from root category node:`, topRootParentCategoryKey);
 
-    // 🔄 RECURSIVE INHERITANCE: Scan entire global database records tracking parent mapping variables
+    // 🔄 RECURSIVE INHERITANCE: Scan entire global database records
     Object.keys(inventory).forEach(invKey => {
         if (invKey === topRootParentCategoryKey || invKey.startsWith(topRootParentCategoryKey + '>')) {
+            // 💡 BUG FIX: Agar array nahi hai toh dynamic empty array do, default presets mat thopo!
             if (!inventory[invKey].allowedUnits) {
-                inventory[invKey].allowedUnits = ["Box", "Pcs", "Pack", "Kg", "Ton"]; // Hydrating presets if absent
+                inventory[invKey].allowedUnits = []; 
             }
             if (!inventory[invKey].allowedUnits.includes(formattedUnit)) {
                 inventory[invKey].allowedUnits.push(formattedUnit);
             }
-            // Auto lock current selection parameter reference to the newly inserted string value choice
+            // Auto lock current selection parameter reference
             inventory[invKey].currentUnit = formattedUnit;
         }
     });
