@@ -832,46 +832,6 @@ if (searchBtn) {
 }
 
 
-document.addEventListener('click', (e) => {
-    const adminMenu = document.getElementById('admin-menu');
-    const menuBtn = document.getElementById('menu-btn');
-    
-    // STRICT FIX: Menu ke bahar click hone par bina history stack chede direct close karo
-    if (adminMenu && adminMenu.classList.contains('active')) {
-        if (!adminMenu.contains(e.target) && !menuBtn?.contains(e.target)) {
-            adminMenu.classList.remove('active');
-        }
-    }
-});
-
-/*function openOverlay(type) {
-    if (type !== 'preview') {
-        document.getElementById('search-section')?.classList.remove('active');
-        document.getElementById('action-modal')?.classList.remove('active');
-        document.getElementById('setting-section')?.classList.remove('active');
-        document.getElementById('breadcrumb-section')?.classList.remove('hidden');
-    }
-
-    if (type === 'search') {
-        document.getElementById('search-section')?.classList.add('active');
-        document.getElementById('breadcrumb-section')?.classList.add('hidden');
-        setTimeout(() => { searchInput.focus(); searchInput.select(); }, 80);
-    } else if (type === 'cart') {
-        document.getElementById('cart-section')?.classList.add('active');
-    } else if (type === 'action-modal' || type === 'modal') { 
-        document.getElementById('action-modal')?.classList.add('active');
-    } else if (type === 'setting') {
-        document.getElementById('setting-section')?.classList.add('active');
-    } else if (type === 'preview') {
-        document.getElementById('preview-section')?.classList.add('active');
-        document.getElementById('cart-section')?.classList.add('active'); 
-    }
-    
-    // STRICT PUSH: Har valid section open par clean history frame lock karo
-    if (window.history.state?.overlay !== type) {
-        history.pushState({ overlay: type }, "");
-    }
-}*/
 // common.js ke openOverlay function ko is tarah line-by-line badlein:
 function openOverlay(type) {
     const mainHeader = document.querySelector('.main-header');
@@ -918,6 +878,12 @@ window.onpopstate = function(event) {
         recognition.stop();
     }
     const state = event.state;
+    if (document.getElementById('admin-menu')?.classList.contains('active')) {
+        if (typeof window.closeAdminMenuDropdownDirectly === 'function') {
+            window.closeAdminMenuDropdownDirectly(true); // true locks down extra historical loop calls
+            return; // Terminate further evaluation chain
+        }
+    }
     if (document.getElementById('preview-zoom-overlay')?.classList.contains('active')) {
         closeInteractiveZoomView(true); // true means history text pop trigger pass parameters safely
         return; // Event chain terminate
@@ -2239,10 +2205,6 @@ function toggleUnitDropdownMenu(element) {
     }
 }
 
-// Global Document overlay body baseline interceptor to close menus on outside clicks safely
-document.addEventListener('click', function() {
-    document.querySelectorAll('.unit-select-dropdown').forEach(d => d.classList.remove('active-menu'));
-});
 
 // Selector handler logic
 function executeUnitSelectChange(key, unitValue, pageType) {
@@ -2352,4 +2314,255 @@ function executeUnitGlobalDelete(key, unitToDelete) {
     document.querySelectorAll('.unit-select-dropdown').forEach(d => d.classList.remove('active-menu'));
     refreshUI();
     showAlert(`Option "${unitToDelete}" deleted completely. 🗑️`, "info");
+}
+
+
+// ==========================================================================
+// --- 🔗 BRAND GRADIENT SYNCED APP LINK SHARE ENGINE WITH DYNAMIC QR CODE ---
+// ==========================================================================
+async function triggerAdminAppLinkSharing() {
+    // Menu dropdown safely close behavior
+    document.getElementById('admin-menu')?.classList.remove('active');
+    
+    showAlert("Generating Premium QR App Share Card... ⏳", "info");
+
+    const dpr = Math.max(window.devicePixelRatio || 1, 2);
+    const canvasWidth = 400;
+    const canvasHeight = 600; 
+
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidth * dpr;
+    canvas.height = canvasHeight * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // 🎨 Layout Backsheet color
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // 🚀 DYNAMIC BRAND GRADIENT BUILDER (Perfect Match with Logo)
+    const brandGradient = ctx.createLinearGradient(100, 0, 300, 0);
+    brandGradient.addColorStop(0, '#1d6881'); 
+    brandGradient.addColorStop(0.5, '#219395'); 
+    brandGradient.addColorStop(1, '#2abb9b'); 
+
+    // 1. DYNAMIC APP LOGO IMAGE LOADING CORE ENGINE
+    const loadAppLogoImage = () => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.src = 'logo.png'; 
+            img.onload = () => resolve(img);
+            img.onerror = () => {
+                console.warn("⚠️ Custom brand logo file loading failed.");
+                resolve(null); 
+            };
+        });
+    };
+
+    const appLogoFileInstance = await loadAppLogoImage();
+
+    if (appLogoFileInstance) {
+        ctx.save();
+        ctx.fillStyle = "rgba(33, 147, 149, 0.06)";
+        ctx.beginPath();
+        ctx.arc(canvasWidth / 2, 50, 28, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(canvasWidth / 2, 50, 24, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(appLogoFileInstance, (canvasWidth / 2) - 24, 26, 48, 48);
+        ctx.restore();
+    } else {
+        ctx.fillStyle = brandGradient; 
+        ctx.beginPath();
+        ctx.arc(canvasWidth / 2, 50, 24, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 20px system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("W", canvasWidth / 2, 57);
+    }
+
+    // App Branding Label Header Title
+    ctx.fillStyle = "#114a5d"; 
+    ctx.font = "bold 20px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("WayStock Master", canvasWidth / 2, 98);
+
+    ctx.fillStyle = "#517483"; 
+    ctx.font = "600 11px system-ui, -apple-system, sans-serif";
+    ctx.fillText("Smart Digital Stock Inventory Console", canvasWidth / 2, 114);
+
+    // 📱 MIDDLE LAYER: Smartphone Phone Mockup Outer Ring Boundary
+    const phoneX = 85;
+    const phoneY = 135;
+    const phoneW = 230;
+    const phoneH = 290; 
+
+    ctx.strokeStyle = "#1a3b47"; 
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(phoneX, phoneY, phoneW, phoneH, 20); 
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.roundRect(phoneX + 2, phoneY + 2, phoneW - 4, phoneH - 4, 18);
+    ctx.fill();
+
+    ctx.fillStyle = brandGradient;
+    ctx.beginPath();
+    ctx.roundRect(phoneX + 10, phoneY + 12, phoneW - 20, 28, 6);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 10.5px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("Way Stock App", phoneX + 18, phoneY + 30);
+
+    const dummyFolders = ["Perfume 💧", "Sweet Paan ☘️", "Packets 🍟", "Cigarette 🚬", "Paan Masala 🎯"];
+    let currentBoxY = phoneY + 52;
+
+    dummyFolders.forEach(folderText => {
+        ctx.fillStyle = "#f8fafc";
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(phoneX + 12, currentBoxY, phoneW - 24, 24, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#219395"; 
+        ctx.font = "10px system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText("📁", phoneX + 20, currentBoxY + 16);
+
+        ctx.fillStyle = "#334155";
+        ctx.font = "600 9.5px system-ui, -apple-system, sans-serif";
+        ctx.fillText(folderText, phoneX + 38, currentBoxY + 15);
+
+        ctx.strokeStyle = "#2abb9b";
+        ctx.beginPath();
+        ctx.arc(phoneX + phoneW - 22, currentBoxY + 12, 4, 0, Math.PI * 2);
+        ctx.stroke();
+
+        currentBoxY += 31; 
+    });
+
+    // 🏁 BOTTOM LAYER: Invitation Link text info execution
+    ctx.fillStyle = "#475569";
+    ctx.font = "600 11px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Scan QR or click link below to join portal:", canvasWidth / 2, phoneY + phoneH + 20);
+
+    // Target link logic setup matching GitHub/Local environment structures
+    const currentFullUrl = window.location.href;
+    const cleanFolderUrlPath = currentFullUrl.substring(0, currentFullUrl.lastIndexOf('/'));
+    const clientPortalWebAddressLink = cleanFolderUrlPath + "/index.html";
+
+    // ==========================================================================
+    // 🌟 AIRTIGHT PROMISE POLLING ENGINE FOR QR GENERATION (100% WORKING)
+    // ==========================================================================
+    const generateQRCodeImagePromise = (textToEncode) => {
+        return new Promise((resolve) => {
+            // Temporary hidden div element dynamically inject kiya body me
+            const tempQRContainer = document.createElement("div");
+            tempQRContainer.style.display = "none";
+            document.body.appendChild(tempQRContainer);
+            
+            // Generate the QR Code instance
+            const qrInstance = new QRCode(tempQRContainer, {
+                text: textToEncode,
+                width: 150,
+                height: 150,
+                colorDark: "#114a5d", 
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            let attempts = 0;
+            const checkQRStream = setInterval(() => {
+                attempts++;
+                
+                // QRCode Library do chize banati hai: ya to HTML5 canvas ya direct <img> tag template
+                const canvasInsideQR = tempQRContainer.querySelector("canvas");
+                const imgInsideQR = tempQRContainer.querySelector("img");
+
+                // Checkpoint A: Agar library ne canvas use kiya hai aur wo ready hai
+                if (canvasInsideQR && canvasInsideQR.width > 0) {
+                    clearInterval(checkQRStream);
+                    const finalImg = new Image();
+                    finalImg.src = canvasInsideQR.toDataURL("image/png");
+                    finalImg.onload = () => {
+                        document.body.removeChild(tempQRContainer); // cleanup memory leak
+                        resolve(finalImg);
+                    };
+                    return;
+                }
+
+                // Checkpoint B: Agar library ne explicit image src inject kar diya hai
+                if (imgInsideQR && imgInsideQR.src && imgInsideQR.src.startsWith("data:image")) {
+                    clearInterval(checkQRStream);
+                    const finalImg = new Image();
+                    finalImg.src = imgInsideQR.src;
+                    finalImg.onload = () => {
+                        document.body.removeChild(tempQRContainer); // cleanup memory leak
+                        resolve(finalImg);
+                    };
+                    return;
+                }
+
+                // Timeout safe exit
+                if (attempts > 30) { 
+                    clearInterval(checkQRStream);
+                    document.body.removeChild(tempQRContainer);
+                    console.warn("⚠️ QR compilation stream timeout.");
+                    resolve(null);
+                }
+            }, 50); // Polling checks loop every 50ms safely
+        });
+    };
+
+    const qrImageInstance = await generateQRCodeImagePromise(clientPortalWebAddressLink);
+
+    if (qrImageInstance) {
+        const qrX = (canvasWidth / 2) - 45;
+        const qrY = phoneY + phoneH + 32;
+
+        // Draw crisp background padding border for the QR matrix block
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.roundRect(qrX - 6, qrY - 6, 102, 102, 10);
+        ctx.fill();
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Inject the verified QR Code image matrix directly on top
+        ctx.drawImage(qrImageInstance, qrX, qrY, 90, 90);
+    }
+
+    try {
+        const generatedInvitationCardURL = canvas.toDataURL("image/png");
+        const response = await fetch(generatedInvitationCardURL);
+        const blob = await response.blob();
+        const file = new File([blob], 'WayStock_App_Invitation.png', { type: "image/png" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: 'Join WayStock Mobile Terminal',
+                text: `👋 Greetings! Scan the card image or use link address below to access portal:\n🔗 Link: ${clientPortalWebAddressLink}`
+            });
+        } else {
+            await navigator.share({
+                title: 'Join WayStock Mobile Terminal',
+                text: `👋 Greetings! Join my digital management portal via active link address:\n🔗 Link: ${clientPortalWebAddressLink}`
+            });
+        }
+    } catch (err) {
+        console.warn("Share link sequence aborted or closed by user:", err);
+    }
 }

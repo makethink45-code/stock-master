@@ -77,17 +77,16 @@ self.addEventListener('push', function(event) {
         }
     }
 
-    const options = {
-        body: payload.body,
-        icon: '/logo.png',
-        badge: '/logo.png',
-        vibrate: [100, 50, 100, 200],
-        tag: payload.tag || 'waystock-push',
-        renotify: true,
-        
-        // 🚀 CRITICAL CONFIG: Phone system ko background custom sound instruction inject karna
-        sound: payload.sound || './notification-sound.wav'
-    };
+// 🟢 FIXED CODE (GitHub Pages layout compatible):
+const options = {
+    body: payload.body,
+    icon: './logo.png',  // 🌟 FIX: Forward slash hatakar repository scope point lock kiya
+    badge: './logo.png', // 🌟 FIX: Idhar bhi continuous repository context path diya
+    vibrate: [100, 50, 100, 200],
+    tag: payload.tag || 'waystock-push',
+    renotify: true,
+    sound: payload.sound || './notification-sound.wav'
+};
 
     event.waitUntil(
         self.registration.showNotification(payload.title, options)

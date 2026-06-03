@@ -2099,7 +2099,6 @@ input:checked + .toggle-slider:before {
 }
 
 
-/* Custom changes to lock manual scale alterations */
 .zoom-viewport-container img {
     max-width: 95%;
     max-height: 90%;
@@ -2111,3 +2110,19 @@ input:checked + .toggle-slider:before {
     pointer-events: none; 
 }
 
+
+.menu-backdrop-shield {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    /* 🌟 FIX: Browser behavior safety ke liye exact transparent rgba code use kiya */
+    background: rgba(0, 0, 0, 0) !important; 
+    z-index: 99998 !important; /* Menu overlay dropdown ke theek niche click capture layer */
+    display: none !important;
+}
+
+.menu-backdrop-shield.active {
+    display: block !important;
+}

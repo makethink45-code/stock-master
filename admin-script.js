@@ -31,28 +31,74 @@
     }
 })();
 
-
 const menuBtn = document.getElementById('menu-btn');
 const adminMenu = document.getElementById('admin-menu');
+const backdropShield = document.getElementById('menu-backdrop-shield');
 
-// --- ADMIN-SCRIPT.JS (TOP MENU FIX) ---
 if (menuBtn && adminMenu) {
     menuBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        // Menu ko kholne/band karne ka simple logic
-        adminMenu.classList.toggle('active');
+        e.preventDefault();
+        
+        const isCurrentlyOpen = adminMenu.classList.contains('active');
+        
+        if (isCurrentlyOpen) {
+            window.history.back(); // Khula he toh system back trigger karo direct
+        } else {
+            adminMenu.classList.add('active');
+            if (backdropShield) backdropShield.classList.add('active');
+            
+            // SYSTEM BACK HISTORY LOCK
+            if (window.history.state?.overlay !== 'admin-dropdown-menu') {
+                history.pushState({ overlay: 'admin-dropdown-menu' }, "");
+            }
+        }
     });
 }
 
-// Menu ke bahar click hone par band karne ke liye
-document.addEventListener('click', () => {
-    if (adminMenu.classList.contains('active')) {
-        adminMenu.classList.remove('active');
+// Global scope close function mapped seamlessly
+window.closeAdminMenuDropdownDirectly = function(isBackAction = false) {
+    const menuBox = document.getElementById('admin-menu');
+    const shieldLayer = document.getElementById('menu-backdrop-shield');
+    
+    // Shield aur Menu dono ko hide karo
+    if (menuBox) menuBox.classList.remove('active');
+    if (shieldLayer) shieldLayer.classList.remove('active');
+
+    // Agar user ne manually click kiya he (isBackAction = false), 
+    // toh history se state pop karo taaki back button sync ho jaye
+    if (!isBackAction && window.history.state?.overlay === 'admin-dropdown-menu') {
+        window.history.back();
     }
-});
+};
 
 
+document.addEventListener('click', function(e) {
+    const activeMenu = document.getElementById('admin-menu');
+    const activeBtn = document.getElementById('menu-btn');
+    
+    if (activeMenu && activeMenu.classList.contains('active')) {
 
+        if (!activeBtn.contains(e.target) && !activeMenu.contains(e.target)) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("🎯 [Interceptor] Menu ke bahar click hua. Closing dropdown safely.");
+            closeAdminMenuDropdownDirectly(); // Safely pops state history back
+        }
+    }
+}, true); // True hierarchy filters capture layer preserved
+
+window.closeAdminMenuDropdownDirectly = function(isBackAction = false) {
+    const menuBox = document.getElementById('admin-menu');
+    const shieldLayer = document.getElementById('menu-backdrop-shield');
+    
+    if (menuBox) menuBox.classList.remove('active');
+    if (shieldLayer) shieldLayer.classList.remove('active');
+
+    if (!isBackAction && window.history.state?.overlay === 'admin-dropdown-menu') {
+        window.history.back();
+    }
+};
 
 let targetParentForNewItem = 'root'; 
 
@@ -84,27 +130,67 @@ function openActionModal(type, parentKey) {
     }
 }
 
+// ==========================================================================
+// --- 🌟 FIXED ADMIN MENU ITEMS EXECUTION (WITH TIMED HISTORY SYNC) ---
+// ==========================================================================
 const menuItems = document.querySelectorAll('.menu-item');
 
+// 1. Add New Item Button
 if (menuItems[0]) {
-    menuItems[0].addEventListener('click', () => {
-        openActionModal('folder'); 
-    });
-}
-
-if (menuItems[1]) {
-    menuItems[1].addEventListener('click', () => {
-        // 🔑 FIX: Setting par click karte hi pehle 3-dot menu dropdown ko band karo
-        if (adminMenu && adminMenu.classList.contains('active')) {
-            adminMenu.classList.remove('active');
+    menuItems[0].onclick = function(e) {
+        e.stopPropagation();
+        // 🌟 STEP 1: Pehle history back aur shield saaf karo
+        if (typeof window.closeAdminMenuDropdownDirectly === 'function') {
+            window.closeAdminMenuDropdownDirectly(false); // isBackAction=false taaki history.back() chale
         }
         
-        // Centralized settings overlay trigger karein
-        if (typeof openOverlay === 'function') {
-            openOverlay('setting'); 
-        }
-    });
+        // 🌟 STEP 2: 150ms ruk kar modal kholo jab history stack stable ho jaye
+        setTimeout(() => {
+            openActionModal('folder'); 
+        }, 150);
+    };
 }
+
+// 2. Settings Button
+if (menuItems[1]) {
+    menuItems[1].onclick = function(e) {
+        e.stopPropagation();
+        // 🌟 STEP 1: Shield aur dropdown dissolve kardo (History pop ke sath)
+        if (typeof window.closeAdminMenuDropdownDirectly === 'function') {
+            window.closeAdminMenuDropdownDirectly(false); 
+        }
+        
+        // 🌟 STEP 2: Brief delay ke baad settings section kholo
+        setTimeout(() => {
+            if (typeof openOverlay === 'function') {
+                openOverlay('setting'); 
+            }
+        }, 150);
+    };
+}
+
+// 3. Share App Link Button (Updated Fix)
+if (menuItems[2]) {
+    menuItems[2].onclick = function(e) {
+        e.stopPropagation();
+        
+        // 🌟 STEP 1: Pehle history back aur shield saaf karo
+        if (typeof window.closeAdminMenuDropdownDirectly === 'function') {
+            // 'false' pass kijiye taaki window.history.back() trigger ho
+            window.closeAdminMenuDropdownDirectly(false); 
+        }
+        
+        // 🌟 STEP 2: Brief delay ke baad share logic trigger karo 
+        // taaki browser share menu aur history pop aapas me na takrayein
+        setTimeout(() => {
+            if (typeof triggerAdminAppLinkSharing === 'function') {
+                triggerAdminAppLinkSharing();
+            }
+        }, 150);
+    };
+}
+
+
 
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -652,9 +738,8 @@ function setupSelectionEventsOnCard(card, key) {
     card.addEventListener('touchend', endPress);
     card.addEventListener('touchcancel', endPress);
 
-    // 🔑 ABSOLUTE CLICK ROUTER INTERCEPTOR
+    // 🔑 CLICK INTERCEPTOR RESTORED TO STANDARD FLAT STATE
     card.onclick = function(e) {
-        // Stop bubbling and prevent any default actions instantly
         e.preventDefault();
         e.stopPropagation();
 
@@ -665,18 +750,15 @@ function setupSelectionEventsOnCard(card, key) {
         const freshInventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
         const isFolder = freshInventory[key] && (freshInventory[key].type === 'folder' || (freshInventory[key].children && freshInventory[key].children.length > 0));
 
-        // 🧠 SELECTION OVERLAY INTERCEPT BLOCK:
         if (window.WayStockAdminState.isSelectionMode === true) {
-            console.log("🔒 Selection Mode Active! Single click selection triggered for key:", key);
-            // Folder Navigation system completely shut down here!
             toggleCardSelection(key);
         } else {
-            // Normal system active
             if (isFolder && typeof handleFolderClick === 'function') {
                 handleFolderClick(key);
             }
         }
     };
+
 }
 
 function triggerBulkDeleteAction() {
@@ -890,182 +972,6 @@ function toggleSettingsStep(drawerId, headerElement) {
     // Agar pehle se khula nahi tha, toh is wale ko open karo smoothly
     if (!isOpenCurrently) {
         parentWrapper.classList.add('step-open');
-    }
-}
-
-// ==========================================================================
-// --- 🔗 BRAND GRADIENT SYNCED APP LINK SHARE GENERATOR ENGINE (common.js) ---
-// ==========================================================================
-async function triggerAdminAppLinkSharing() {
-    // Menu dropdown safely close behavior
-    document.getElementById('admin-menu')?.classList.remove('active');
-    
-    showAlert("Generating Branded App Share Card... ⏳", "info");
-
-    const dpr = Math.max(window.devicePixelRatio || 1, 2);
-    const canvasWidth = 400;
-    const canvasHeight = 550;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasWidth * dpr;
-    canvas.height = canvasHeight * dpr;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-
-    // 🎨 Layout Backsheet color
-    ctx.fillStyle = "#f8fafc";
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-    // ==========================================================================
-    // 🚀 DYNAMIC BRAND GRADIENT BUILDER (Matching your Logo perfectly)
-    // ==========================================================================
-    // Creating matching gradients for phone header and backgrounds
-    const brandGradient = ctx.createLinearGradient(100, 0, 300, 0);
-    brandGradient.addColorStop(0, '#1d6881'); // Deep Teal from your upper logo part
-    brandGradient.addColorStop(0.5, '#219395'); // Medium Cyan center mix
-    brandGradient.addColorStop(1, '#2abb9b'); // Greenish Teal from lower logo edge
-
-    // 1. DYNAMIC APP LOGO IMAGE LOADING CORE ENGINE
-    const loadAppLogoImage = () => {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.src = 'logo.png'; 
-            img.onload = () => resolve(img);
-            img.onerror = () => {
-                console.warn("⚠️ Custom brand logo file loading failed. Using fallback gradient circle.");
-                resolve(null); 
-            };
-        });
-    };
-
-    const appLogoFileInstance = await loadAppLogoImage();
-
-    if (appLogoFileInstance) {
-        // 🟢 RENDER LOGO WITH SMOOTH BACKGROUND RING
-        ctx.save();
-        // Dynamic circular outer backdrop shadow glow
-        ctx.fillStyle = "rgba(33, 147, 149, 0.06)";
-        ctx.beginPath();
-        ctx.arc(canvasWidth / 2, 55, 30, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Clip logo inside perfect circle mesh
-        ctx.beginPath();
-        ctx.arc(canvasWidth / 2, 55, 26, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(appLogoFileInstance, (canvasWidth / 2) - 26, 29, 52, 52);
-        ctx.restore();
-    } else {
-        // 🔴 FALLBACK METHOD using the newly created gradient
-        ctx.fillStyle = brandGradient; 
-        ctx.beginPath();
-        ctx.arc(canvasWidth / 2, 55, 26, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 22px system-ui, -apple-system, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("W", canvasWidth / 2, 63);
-    }
-
-    // App Branding Label Header Title (Color synced with Logo dark tone)
-    ctx.fillStyle = "#114a5d"; 
-    ctx.font = "bold 21px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("WayStock Master", canvasWidth / 2, 108);
-
-    ctx.fillStyle = "#517483"; // Soter muted typography shade
-    ctx.font = "600 11.5px system-ui, -apple-system, sans-serif";
-    ctx.fillText("Smart Digital Stock Inventory Console", canvasWidth / 2, 126);
-
-    // 📱 MIDDLE LAYER: Smartphone Phone Mockup Outer Ring Boundary
-    const phoneX = 80;
-    const phoneY = 150;
-    const phoneW = 240;
-    const phoneH = 320;
-
-    ctx.strokeStyle = "#1a3b47"; // Deep slate teal phone borders
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.roundRect(phoneX, phoneY, phoneW, phoneH, 22); 
-    ctx.stroke();
-
-    // Smartphone Screen Internal Backsheet Layout
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.roundRect(phoneX + 2, phoneY + 2, phoneW - 4, phoneH - 4, 20);
-    ctx.fill();
-
-    // 🌟 MOCK HEADER DIRECT GRADIENT FILL (Perfect Match!)
-    ctx.fillStyle = brandGradient;
-    ctx.beginPath();
-    ctx.roundRect(phoneX + 10, phoneY + 14, phoneW - 20, 32, 6);
-    ctx.fill();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("Way Stock (Najim)", phoneX + 20, phoneY + 33);
-
-    // Mockup Folder Grid List Components
-    const dummyFolders = ["Perfume 💧", "Sweet Paan ☘️", "Packets 🍟", "Cigarette 🚬", "Paan Masala 🎯"];
-    let currentBoxY = phoneY + 60;
-
-    dummyFolders.forEach(folderText => {
-        ctx.fillStyle = "#f8fafc";
-        ctx.strokeStyle = "#e2e8f0";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.roundRect(phoneX + 12, currentBoxY, phoneW - 24, 26, 6);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = "#219395"; // Folder bullet color matching logo core
-        ctx.font = "11px system-ui, -apple-system, sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText("📁", phoneX + 22, currentBoxY + 17);
-
-        ctx.fillStyle = "#334155";
-        ctx.font = "600 10px system-ui, -apple-system, sans-serif";
-        ctx.fillText(folderText, phoneX + 42, currentBoxY + 16);
-
-        // Active switch check indicators (Synced with logo success color)
-        ctx.strokeStyle = "#2abb9b";
-        ctx.beginPath();
-        ctx.arc(phoneX + phoneW - 24, currentBoxY + 13, 4.5, 0, Math.PI * 2);
-        ctx.stroke();
-
-        currentBoxY += 34; 
-    });
-
-    // 🏁 BOTTOM LAYER: Info text footer frame
-    ctx.fillStyle = "#475569";
-    ctx.font = "500 11px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Scan or click link below to join current inventory portal:", canvasWidth / 2, phoneY + phoneH + 25);
-
-    try {
-        const generatedInvitationCardURL = canvas.toDataURL("image/png");
-        const response = await fetch(generatedInvitationCardURL);
-        const blob = await response.blob();
-        const file = new File([blob], 'WayStock_App_Invitation.png', { type: "image/png" });
-
-        const clientPortalWebAddressLink = window.location.origin + "/index.html";
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-                files: [file],
-                title: 'Join WayStock Mobile Terminal',
-                text: `👋 Greetings! Join my digital management portal via active link address:\n🔗 Link: ${clientPortalWebAddressLink}`
-            });
-        } else {
-            await navigator.share({
-                title: 'Join WayStock Mobile Terminal',
-                text: `👋 Greetings! Join my digital management portal via active link address:\n🔗 Link: ${clientPortalWebAddressLink}`
-            });
-        }
-    } catch (err) {
-        console.warn("Share link sequence aborted or collapsed:", err);
     }
 }
 
