@@ -88,6 +88,71 @@ function getActiveInventory() {
     return window.wayStock_runtime_inventory || {};
 }
 
+
+// ==========================================================================
+// ☁️ INITIAL DATABASE BATCH LOADER & CACHE HYDRATOR
+// ==========================================================================
+async function loadFirebaseData() {
+    try {
+        // Step 1: Local IndexedDB Initialize karo sabse pehle
+        await initWayStockIndexedDB();
+        
+        // Step 2: Instant Memory Hydration (Local cache se fast read)
+        let cachedInventory = await readFromIndexedDB();
+        if (cachedInventory) {
+            window.wayStock_runtime_inventory = cachedInventory; // RAM update
+            if (typeof refreshUI === "function") refreshUI();
+            console.log("📦 Loaded instantly from local IndexedDB storage cache.");
+        }
+
+        // Step 3: Internet Check Guard Gate
+        if (!navigator.onLine) {
+            console.log("✈️ Device offline he, operating strictly via local cache memory.");
+            return; 
+        }
+
+        console.log("☁️ Connected! Pulling segmented core structures from Firestore...");
+
+        // Step 4: Firebase se Master Root Structure fetch karo
+        const rootSnapshot = await stockCollectionRef.doc("rootStructures").get();
+        let freshFullInventory = {};
+
+        if (rootSnapshot.exists) {
+            freshFullInventory = rootSnapshot.data();
+            
+            // Step 5: Saare segments ko parallelly fetch karke merge karo
+            const segmentFetchPromises = Object.keys(freshFullInventory).map(rootKey => {
+                return stockCollectionRef.doc(`segment_${rootKey.replaceAll(" ", "_")}`).get();
+            });
+            
+            const segmentSnapshots = await Promise.all(segmentFetchPromises);
+            segmentSnapshots.forEach(snap => {
+                if (snap.exists) {
+                    Object.assign(freshFullInventory, snap.data());
+                }
+            });
+
+            // Local Token sync karein validation ke liye
+            const versionDoc = await tokenRef.get();
+            if (versionDoc.exists) {
+                localStorage.setItem('wayStock_local_token', String(versionDoc.data().token));
+            }
+
+            // Step 6: RAM aur IndexedDB dono ko overwrite karke safe update lock karo
+            window.wayStock_runtime_inventory = freshFullInventory;
+            saveToIndexedDB(freshFullInventory);
+            
+            if (typeof refreshUI === "function") refreshUI();
+            console.log("🎉 Firebase segmented data load complete and synced to IndexedDB!");
+        } else {
+            console.log("⚠️ No data found inside rootStructures cloud document root.");
+        }
+    } catch (e) {
+        console.error("❌ loadFirebaseData core infrastructure crashed:", e);
+    }
+}
+
+
 // ☁️ SMART MULTI-DOC SYNCHRONIZER
 async function syncToFirebase() {
     const inventory = getActiveInventory(); // LocalStorage ki jagah RAM se uthaya
@@ -126,77 +191,6 @@ async function syncToFirebase() {
     }
 }
 
-// 📥 OPTIMIZED OFFLINE-FIRST BATCH CONTEXT LOADER
-async function loadFirebaseData() {
-    try {
-        // Step 1: Local IndexedDB Initialize karo sabse pehle
-        await initWayStockIndexedDB();
-        
-        // Step 2: Instant Memory Hydration (Bina internet ke wait kiye sseedha local read)
-        let cachedInventory = await readFromIndexedDB();
-        if (cachedInventory) {
-            // Memory me populate ho chuka he, instantly UI refresh maar do
-            if (typeof refreshUI === "function") refreshUI();
-            console.log("📦 [Offline Engine] Loaded instantly from local IndexedDB storage cache.");
-        }
-
-        // Step 3: Internet Check Guard Gate
-        if (!navigator.onLine) {
-            console.log("✈️ [Offline Engine] No Internet Connection. Operating strictly in Offline-First Mode.");
-            return; // Yahin se runtime terminate, no firebase overhead
-        }
-
-        console.log("☁️ [Offline Engine] Network found. Verifying cloud delta synchronization tokens...");
-
-        // Step 4: Master Version Matching Call (Sirf 1 haldi document check)
-        const tokenSnapshot = await tokenRef.get().catch(err => {
-            console.log("⚠️ [Offline Engine] Firebase handshake timeout. Defaulting to local offline data.");
-            return null;
-        });
-
-        if (!tokenSnapshot || !tokenSnapshot.exists) return;
-
-        const cloudToken = String(tokenSnapshot.data().token);
-        const localToken = String(localStorage.getItem('wayStock_local_token'));
-
-        // Strict Enforcement: Agar token barabar he, toh server se single byte bhi download nahi hoga!
-        if (cloudToken === localToken && cachedInventory) {
-            console.log(`🎯 [Offline Engine] Token Matched (${localToken}). Cache is healthy. Blocked server queries.`);
-            return;
-        }
-
-        // Step 5: Delta Download Loop (Sirf tabhi chalega jab sach me badlao hua ho)
-        console.log("🔄 [Offline Engine] Token mismatched. Re-assembling fresh segments into local block...");
-        
-        const rootSnapshot = await stockCollectionRef.doc("rootStructures").get();
-        let freshFullInventory = {};
-
-        if (rootSnapshot.exists) {
-            freshFullInventory = rootSnapshot.data();
-            const rootKeys = Object.keys(freshFullInventory);
-
-            const segmentFetchPromises = rootKeys.map(rootKey => {
-                return stockCollectionRef.doc(`segment_${rootKey.replaceAll(" ", "_")}`).get();
-            });
-            const segmentSnapshots = await Promise.all(segmentFetchPromises);
-
-            segmentSnapshots.forEach(snap => {
-                if (snap.exists) {
-                    Object.assign(freshFullInventory, snap.data());
-                }
-            });
-
-            // Token register update aur safely write into IndexedDB
-            localStorage.setItem('wayStock_local_token', cloudToken);
-            saveToIndexedDB(freshFullInventory);
-            
-            if (typeof refreshUI === "function") refreshUI();
-            console.log("🎉 [Offline Engine] Cloud compilation complete. Cache flushed & hydrated successfully.");
-        }
-    } catch (e) {
-        console.error("❌ [Offline Engine] Segmented bundle boot collection crashed:", e);
-    }
-}
 
 // 🔄 MULTI-TAB LIVE RE-SYNC WATCHER (WIRED WITH OFFLINE NETWORK GAARDS)
 tokenRef.onSnapshot(async (doc) => {
@@ -2661,3 +2655,4 @@ const clientPortalWebAddressLink = cleanFolderUrlPath + "/";
         console.warn("Share link sequence aborted or closed by user:", err);
     }
 }
+

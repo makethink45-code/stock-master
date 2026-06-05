@@ -382,14 +382,63 @@ if (isEditModeActive && editTargetKey) {
     if (typeof renderAdminInventory === "function") renderAdminInventory();
     showAlert("Structure successfully create ho gaya! 🚀", "success");
 }*/
+  
 function processBulkData() {
     const inputField = document.getElementById('modal-input');
+    if (!inputField) return;
+    
     const rawData = inputField.value.trim();
     if (!rawData) return;
 
     let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
-    
-    // 📊 EXCEL/SHEET SUPPORT: Newline ya Tab se split karke data parse karein
+    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
+    let cart = typeof getCartItems === "function" ? getCartItems() : {};
+
+    // ----------------------------------------------------------------------
+    // 🔥 BRANCH A: IF EDIT MODE IS ACTIVE - TRANSFORM NAME WITHOUT DUPLICATES
+    // ----------------------------------------------------------------------
+    if (isEditModeActive && editTargetKey) {
+        if (inventory[editTargetKey]) {
+            const newName = capitalizeWords(rawData); 
+            const oldName = inventory[editTargetKey].name;
+
+            // Actual Node references update lock
+            inventory[editTargetKey].name = newName;
+            inventory[editTargetKey].displayName = newName;
+
+            // My Bucket Real-time synchronization
+            Object.keys(cart).forEach(cKey => {
+                if (cKey === editTargetKey || cKey.startsWith(editTargetKey + '>')) {
+                    if (cart[cKey].name === oldName) {
+                        cart[cKey].name = newName;
+                    }
+                }
+            });
+
+            // Local DB commit registers
+            localStorage.setItem('wayStock_inventory', JSON.stringify(inventory));
+            if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
+            if (typeof syncToFirebase === "function") syncToFirebase();
+            localStorage.setItem(cartKey, JSON.stringify(cart));
+            
+            showAlert("Naam successfully badal gaya aur Cart me bhi sync ho gaya! ✅", "success");
+        }
+
+        // Reset execution control vectors safely
+        isEditModeActive = false;
+        editTargetKey = "";
+        const actionBtn = document.getElementById('modal-action-btn');
+        if (actionBtn) actionBtn.innerText = "Create Structure 🚀";
+        
+        inputField.value = ""; 
+        closeAllOverlays(); 
+        if (typeof exitSelectionMode === 'function') exitSelectionMode(); 
+        return; 
+    }
+
+    // ----------------------------------------------------------------------
+    // 📊 BRANCH B: IF BULK MODE ACTIVE - RUN DEEP EXCEL SEGMENATION PARSING
+    // ----------------------------------------------------------------------
     const lines = rawData.split(/\r?\n|\t/)
                          .map(line => line.trim())
                          .filter(line => line.length > 0);
@@ -400,7 +449,6 @@ function processBulkData() {
     }
 
     lines.forEach(line => {
-        // '>' symbol se folder structure banega, warna direct item
         const levels = line.split('>').map(lvl => capitalizeWords(lvl.trim()));
         let currentParent = targetParentForNewItem || window.currentFolder || 'root';
 
@@ -419,7 +467,9 @@ function processBulkData() {
                 };
 
                 if (inventory[currentParent] && !inventory[currentParent].children.includes(uniqueKey)) {
-                    inventory[inventory[currentParent].type = 'folder']; // Force parent to be folder
+                    if(inventory[currentParent].type !== 'folder') {
+                        inventory[currentParent].type = 'folder'; 
+                    }
                     inventory[currentParent].children.push(uniqueKey);
                 }
             }
@@ -427,6 +477,7 @@ function processBulkData() {
         });
     });
 
+    // Atomic storage commit protocols locks
     if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
     if (typeof syncToFirebase === "function") syncToFirebase();
     
@@ -435,7 +486,6 @@ function processBulkData() {
     if (typeof renderAdminInventory === "function") renderAdminInventory();
     showAlert("Excel data successfully import ho gaya! 🚀", "success");
 }
-
         
 
 window.renderAdminInventory = function() {
@@ -817,29 +867,30 @@ function setupSelectionEventsOnCard(card, key) {
 function triggerBulkDeleteAction() {
     if (window.WayStockAdminState.selectedCards.length === 0) return;
 
-    if (confirm(`Kya aap in ${window.WayStockAdminState.selectedCards.length} selected items aur unke saare sub-folders/products ko permanently delete karna chahte hain?`)) {
-        let inventory = JSON.parse(localStorage.getItem('wayStock_inventory')) || {};
-        
-        // 🔑 MULTI-USER FIX: Static key ki jagah dynamic storage key use karein
+    if (confirm(`Kya aap in ${window.WayStockAdminState.selectedCards.length} selected items aur unke saare sub-folders ko permanently delete karna chahte hain?`)) {
+        let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
         const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
         let cart = typeof getCartItems === "function" ? getCartItems() : {};
         
         window.WayStockAdminState.selectedCards.forEach(selectedKey => {
-            
+            // SAFETY FILTER: Agar key khali he toh skip karo, poora data nahi udna chahiye
+            if (!selectedKey || selectedKey === 'root') return;
+
             // --- 🔴 STEP 1: PARENT TREE CLEANUP ---
             const parentKey = inventory[selectedKey]?.parent; 
-            if (parentKey && inventory[parentKey]) { 
+            if (parentKey && inventory[parentKey] && inventory[parentKey].children) { 
                 inventory[parentKey].children = inventory[parentKey].children.filter(c => c !== selectedKey); 
             }
 
-            // --- 🔴 STEP 2: DEEP RECURSIVE SUB-CATEGORY DELETION ---
+            // --- 🔴 STEP 2: STRICT SAFE RECURSIVE DELETION ---
             Object.keys(inventory).forEach(invKey => {
+                // Exact key match ho ya strict parent-child separator '>' ke sath shuru ho
                 if (invKey === selectedKey || invKey.startsWith(selectedKey + '>')) {
                     delete inventory[invKey]; 
                 }
             });
 
-            // --- 🔴 STEP 3: DYNAMIC BUCKET / CART AUTOMATIC CLEANUP ---
+            // --- 🔴 STEP 3: CART BUCKET CLEANUP ---
             Object.keys(cart).forEach(cartKeyElement => {
                 if (cartKeyElement === selectedKey || cartKeyElement.startsWith(selectedKey + '>')) {
                     delete cart[cartKeyElement]; 
@@ -847,22 +898,19 @@ function triggerBulkDeleteAction() {
             });
         });
 
-        // Atomic commit locks
+        // Atomic commit locks safely to IndexedDB and Firebase Cloud
         if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
-        
-        // 🔑 FIXED: Dynamic key par properly cart save karein
         localStorage.setItem(cartKey, JSON.stringify(cart));
-        
-        showAlert("Selected structure aur unke saare products cart samet saaf ho gaye! 🔥", "success");
         
         if (typeof syncToFirebase === "function") {
             syncToFirebase(); 
         }
+        
+        showAlert("Selected items successfully delete ho gaye! 🔥", "success");
         if (typeof window.renderAdminInventory === "function") window.renderAdminInventory();
         exitSelectionMode(true); 
     }
 }
-
 
 function triggerBulkCartAction() {
     let cart = typeof getCartItems === "function" ? getCartItems() : {};
