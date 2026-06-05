@@ -105,9 +105,9 @@ self.addEventListener('notificationclick', function(event) {
                 }
             }
             // Agar band he, toh naya window kholo
-            if (clients.openWindow) {
-                return clients.openWindow('/');
-            }
+if (clients.openWindow) {
+    return clients.openWindow('./index.html');
+}
         })
     );
 });

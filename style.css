@@ -896,8 +896,10 @@ input:checked + .toggle-slider:before {
     transition: opacity 0.2s;
 }
 
-.card-qty-controller.swiping-right::after { color: #10b981; opacity: 1; }
-.card-qty-controller.swiping-left::before { color: #f43f5e; opacity: 1; }
+/* 🌟 REVERSED ARROW COLORS SYNC */
+.card-qty-controller.swiping-right::before { color: #10b981; opacity: 1; } /* Left indicator arrow green hoga */
+.card-qty-controller.swiping-left::after { color: #f43f5e; opacity: 1; }  /* Right indicator arrow red hoga */
+
 
 
 

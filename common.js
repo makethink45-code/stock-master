@@ -1926,19 +1926,31 @@ const gatewayVisuals = document.getElementById('gateway-visuals');
 const gatewayInput = document.getElementById('gateway-pin-input');
 const gatewaySubmit = document.getElementById('gateway-submit-btn');
 
+
 if (searchInput && gatewayOverlay && gatewayInput && gatewaySubmit) {
-    // Standard keyboard interceptor from pichle guidelines
     searchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const queryText = searchInput.value.trim().toLowerCase();
 
-            // 🔑 SECRET COMMAND LOCK: Exact 'admin.html' text matching
+            // SECRET COMMAND LOCK: Exact 'admin.html' text matching
             if (queryText === 'admin.html') {
                 e.preventDefault();
-                searchInput.value = ""; // Textarea saaf karo
-                document.getElementById('search-suggestion-chips').style.display = 'none';
+                
+                // 🌟 CRITICAL OFFLINE BLOCK FILTER
+                // Agar device me active internet connection nahi he, toh portal block karo instantly!
+                if (!navigator.onLine) {
+                    searchInput.value = ""; // Search bar saaf karo
+                    const suggestionChips = document.getElementById('search-suggestion-chips');
+                    if (suggestionChips) suggestionChips.style.display = 'none';
+                    closeAllOverlays(); // Search window aur overlays ko collapse kardo
+                    return; // Yahin se runtime terminate! Aage PIN maangne ka box khulega hi nahi.
+                }
 
-                // Boring prompt hatau, Custom Immersion design activate karo
+                // Online Mode: Agar internet chal raha he, tabhi custom immersion security design open hoga
+                searchInput.value = ""; 
+                const suggestionChips = document.getElementById('search-suggestion-chips');
+                if (suggestionChips) suggestionChips.style.display = 'none';
+
                 closeAllOverlays();
                 gatewayOverlay.classList.add('active');
                 setTimeout(() => { gatewayInput.focus(); gatewayInput.select(); }, 80);
@@ -2021,7 +2033,7 @@ localStorage.setItem('wayStock_admin_expiry', expiryTimestamp);
     }
 }
 
-document.addEventListener('touchstart', function(e) {
+/*1 document.addEventListener('touchstart', function(e) {
     const swipeZone = e.target.closest('.gesture-swipe-zone');
     if (!swipeZone) return;
 
@@ -2097,7 +2109,84 @@ document.addEventListener('touchstart', function(e) {
 
     document.addEventListener('touchmove', onTouchMove, { passive: false });
     document.addEventListener('touchend', onTouchEnd);
+});*/
+
+// ==========================================================================
+// 🔄 REVERSED GESTURE QUANTITY SWIPE ZONE ENGINE (common.js)
+// ==========================================================================
+document.addEventListener('touchstart', function(e) {
+    const swipeZone = e.target.closest('.gesture-swipe-zone');
+    if (!swipeZone) return;
+
+    if (document.activeElement === swipeZone.querySelector('input')) return; 
+
+    const key = swipeZone.getAttribute('data-swipe-key');
+    const inputElement = swipeZone.querySelector('input');
+    if (!key || !inputElement) return;
+
+    let startX = e.touches[0].clientX;
+    let initialQty = parseInt(inputElement.value, 10) || 1;
+    let accumulatedDelta = 0;
+    let hasMovedMoved = false; 
+    
+    const SENSITIVITY_PIXELS = 15; 
+
+    function onTouchMove(moveEvent) {
+        const currentX = moveEvent.touches[0].clientX;
+        const currentDiffX = currentX - startX;
+
+        if (Math.abs(currentDiffX) > 5) {
+            hasMovedMoved = true;
+            moveEvent.preventDefault();
+            moveEvent.stopPropagation();
+        } else {
+            return;
+        }
+
+        // 🌟 DIRECTION REVERSE VISUALS: Visual effects ko ulta kiya
+        if (currentDiffX > 5) {
+            swipeZone.classList.add('swiping-left'); // Right swipe par red tint (Minus)
+            swipeZone.classList.remove('swiping-right');
+        } else if (currentDiffX < -5) {
+            swipeZone.classList.add('swiping-right'); // Left swipe par green tint (Plus)
+            swipeZone.classList.remove('swiping-left');
+        }
+
+        // 🌟 DIRECTION REVERSE MATH: currentChange ke aage minus (-) lagakar calculations ulti ki
+const currentChange = -Math.floor(currentDiffX / SENSITIVITY_PIXELS);
+        if (currentChange !== accumulatedDelta) {
+            let nextCalculatedQty = initialQty + currentChange;
+            if (nextCalculatedQty < 0) nextCalculatedQty = 0;
+
+            inputElement.value = nextCalculatedQty; 
+            accumulatedDelta = currentChange;
+            swipeZone.style.transform = "scale(1.04)";
+        }
+    }
+
+    function onTouchEnd() {
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+        
+        swipeZone.classList.remove('swiping-right', 'swiping-left');
+        swipeZone.style.transform = "scale(1)";
+
+        if (!hasMovedMoved) {
+            inputElement.removeAttribute('readonly');
+            inputElement.focus();
+            inputElement.select(); 
+            return; 
+        }
+
+        const finalParsedQty = parseInt(inputElement.value, 10);
+        commitQuantityToStorage(key, finalParsedQty);
+    }
+
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
 });
+
+
 
 // 🔑 DIRECT KEYPAD INPUT INTERCEPTORS & SYNC BLOCKS
 document.addEventListener('focusin', function(e) {
@@ -2317,9 +2406,7 @@ function executeUnitGlobalDelete(key, unitToDelete) {
 }
 
 
-// ==========================================================================
-// --- 🔗 BRAND GRADIENT SYNCED APP LINK SHARE ENGINE WITH DYNAMIC QR CODE ---
-// ==========================================================================
+
 async function triggerAdminAppLinkSharing() {
     // Menu dropdown safely close behavior
     document.getElementById('admin-menu')?.classList.remove('active');
@@ -2460,11 +2547,11 @@ async function triggerAdminAppLinkSharing() {
     // Target link logic setup matching GitHub/Local environment structures
     const currentFullUrl = window.location.href;
     const cleanFolderUrlPath = currentFullUrl.substring(0, currentFullUrl.lastIndexOf('/'));
-    const clientPortalWebAddressLink = cleanFolderUrlPath + "/index.html";
+    // 🟢 FIXED: /index.html ko jad se saaf kiya, ab clean routing link generate hoga
+const clientPortalWebAddressLink = cleanFolderUrlPath + "/";
 
-    // ==========================================================================
-    // 🌟 AIRTIGHT PROMISE POLLING ENGINE FOR QR GENERATION (100% WORKING)
-    // ==========================================================================
+
+
     const generateQRCodeImagePromise = (textToEncode) => {
         return new Promise((resolve) => {
             // Temporary hidden div element dynamically inject kiya body me

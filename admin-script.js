@@ -226,7 +226,7 @@ function capitalizeWords(str) {
     }).join(' ');
 }
 
-function processBulkData() {
+/*1 function processBulkData() {
     const inputField = document.getElementById('modal-input'); //
     const rawData = inputField.value.trim(); //
     if (!rawData) return; //
@@ -381,6 +381,59 @@ if (isEditModeActive && editTargetKey) {
     closeAllOverlays(); 
     if (typeof renderAdminInventory === "function") renderAdminInventory();
     showAlert("Structure successfully create ho gaya! 🚀", "success");
+}*/
+function processBulkData() {
+    const inputField = document.getElementById('modal-input');
+    const rawData = inputField.value.trim();
+    if (!rawData) return;
+
+    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+    
+    // 📊 EXCEL/SHEET SUPPORT: Newline ya Tab se split karke data parse karein
+    const lines = rawData.split(/\r?\n|\t/)
+                         .map(line => line.trim())
+                         .filter(line => line.length > 0);
+
+    if (lines.length === 0) {
+        showAlert("Data empty he! Excel se copy karke yahan paste karein. 📋", "error");
+        return;
+    }
+
+    lines.forEach(line => {
+        // '>' symbol se folder structure banega, warna direct item
+        const levels = line.split('>').map(lvl => capitalizeWords(lvl.trim()));
+        let currentParent = targetParentForNewItem || window.currentFolder || 'root';
+
+        levels.forEach((name, index) => {
+            const isLast = (index === levels.length - 1);
+            const uniqueKey = currentParent === 'root' ? name : `${currentParent}>${name}`;
+
+            if (!inventory[uniqueKey]) {
+                inventory[uniqueKey] = {
+                    name: name,
+                    displayName: name,
+                    type: isLast ? 'item' : 'folder',
+                    parent: currentParent,
+                    toggleOn: false,
+                    children: []
+                };
+
+                if (inventory[currentParent] && !inventory[currentParent].children.includes(uniqueKey)) {
+                    inventory[inventory[currentParent].type = 'folder']; // Force parent to be folder
+                    inventory[currentParent].children.push(uniqueKey);
+                }
+            }
+            currentParent = uniqueKey;
+        });
+    });
+
+    if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
+    if (typeof syncToFirebase === "function") syncToFirebase();
+    
+    inputField.value = "";
+    closeAllOverlays();
+    if (typeof renderAdminInventory === "function") renderAdminInventory();
+    showAlert("Excel data successfully import ho gaya! 🚀", "success");
 }
 
         

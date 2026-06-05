@@ -3,19 +3,21 @@
   "name": "WayStock Master Inventory",
   "icons": [
     {
-      "src": "logo.png",
+      "src": "./logo.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "logo.png",
+      "src": "./logo.png",
       "type": "image/png",
       "sizes": "512x512"
     }
   ],
-  "start_url": "/index.html",
+  "start_url": "./index.html",
+  "scope": "./",
   "background_color": "#f8fafc",
-  "theme_color": "#2563eb",
+  "theme_color": "#1d6881",
   "display": "standalone",
   "orientation": "portrait"
 }
+
