@@ -2406,6 +2406,14 @@ function executeUnitGlobalDelete(key, unitToDelete) {
 }
 
 
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.unit-dropdown-wrapper')) {
+        document.querySelectorAll('.unit-select-dropdown').forEach(dropdown => {
+            dropdown.classList.remove('active-menu');
+        });
+    }
+});
+
 
 async function triggerAdminAppLinkSharing() {
     // Menu dropdown safely close behavior
