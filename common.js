@@ -88,10 +88,6 @@ function getActiveInventory() {
     return window.wayStock_runtime_inventory || {};
 }
 
-
-// ==========================================================================
-// ☁️ INITIAL DATABASE BATCH LOADER & CACHE HYDRATOR
-// ==========================================================================
 async function loadFirebaseData() {
     try {
         // Step 1: Local IndexedDB Initialize karo sabse pehle
@@ -152,7 +148,6 @@ async function loadFirebaseData() {
     }
 }
 
-
 // ☁️ SMART MULTI-DOC SYNCHRONIZER
 async function syncToFirebase() {
     const inventory = getActiveInventory(); // LocalStorage ki jagah RAM se uthaya
@@ -190,7 +185,6 @@ async function syncToFirebase() {
         console.error("Multi-doc segment push failed:", e);
     }
 }
-
 
 // 🔄 MULTI-TAB LIVE RE-SYNC WATCHER (WIRED WITH OFFLINE NETWORK GAARDS)
 tokenRef.onSnapshot(async (doc) => {
@@ -400,104 +394,60 @@ function getEmptyStateHTML() {
     `;
 }
 
+// Global array to hold current session's preview slips
+window.WayStockPreviewImages = [];
+window.WayStockCurrentImageIndex = 0;
+
 function generateCartPreview() {
-    const cart = getCartItems();
-    const inventory = getActiveInventory();
-    const keys = Object.keys(cart);
+    const cart = getCartItems(); // cite: Source: common.js
+    const inventory = getActiveInventory(); // cite: Source: common.js
+    const keys = Object.keys(cart); // cite: Source: common.js
 
-    if (keys.length === 0) {
-        showAlert("Preview ke liye bucket me maal hona zaroori hai! 🛒", "error");
-        return;
-    }
+    if (keys.length === 0) { // cite: Source: common.js
+        showAlert("Preview ke liye bucket me maal hona zaroori hai! 🛒", "error"); // cite: Source: common.js
+        return; // cite: Source: common.js
+    } // cite: Source: common.js
 
-    // 1. Root folder ke hisab se grouping karna
-    const groupedCart = {};
-    keys.forEach(key => {
-        const item = cart[key];
-        const root = item.rootFolder || "Home";
-        if (!groupedCart[root]) groupedCart[root] = [];
-        groupedCart[root].push({ cartKey: key, ...item });
-    });
+    const groupedCart = {}; // cite: Source: common.js
+    keys.forEach(key => { // cite: Source: common.js
+        const item = cart[key]; // cite: Source: common.js
+        const root = item.rootFolder || "Home"; // cite: Source: common.js
+        if (!groupedCart[root]) groupedCart[root] = []; // cite: Source: common.js
+        groupedCart[root].push({ cartKey: key, ...item }); // cite: Source: common.js
+    }); // cite: Source: common.js
 
-    const previewContentArea = document.getElementById('preview-content-area');
-    if (!previewContentArea) return;
+    const previewContentArea = document.getElementById('preview-content-area'); // cite: Source: common.js
+    if (!previewContentArea) return; // cite: Source: common.js
 
-    previewContentArea.innerHTML = ""; 
+    previewContentArea.innerHTML = ""; // Reset grid items area
+    window.WayStockPreviewImages = []; // Reset global array for fresh session
+    
+    // 🌟 UPDATED BADGE APPEND ENGINE WITH GLOBAL INDEX POINTER
+    function appendPreviewCardToDOM(imgURL, rootName, itemKeysList) {
+        // Current image ko global array stack me save karo
+        window.WayStockPreviewImages.push(imgURL);
+        const currentImgIndex = window.WayStockPreviewImages.length - 1;
 
-    // 🚀 INITIALIZE GLOBAL MATRIX ENHANCEMENTS & CONSTANTS
-    const dpr = Math.max(window.devicePixelRatio || 1, 2); 
-    const rowHeight = 40;       
-    const headerHeight = 85;    
-    const displayWidth = 450;    
-    const displayHeight = 600; 
-
-    // Inline Layout Definition Helper (🌟 Dynamic Keys Integration)
-  /*  function appendPreviewCardToDOM(imgURL, rootName, itemKeysList) {
         const downloadSVG = `
-            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" stroke="var(--primary)" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-        `;
-        
+            </svg>`;
+
         const whatsappSVG = `
             <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-            </svg>
-        `;
+            </svg>`;
 
-        const encodedText = encodeURIComponent(`🚨 *New WayStock Order Preview*\nCategory Group: *${rootName}*\nPhoto slip generated via app registry. Please check image attachment! 🚀`);
-        const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
+        const serializedKeys = encodeURIComponent(JSON.stringify(itemKeysList)); // cite: Source: common.js
 
-        // 🌟 KEY LOCK MATRIX: Keys array ko stringified karke dynamic function injection me save kiya
-        const serializedKeys = encodeURIComponent(JSON.stringify(itemKeysList));
-
-        const previewCard = document.createElement('div'); 
-        previewCard.className = "group-preview-card"; 
+        const previewCard = document.createElement('div'); // cite: Source: common.js
+        previewCard.className = "group-preview-card"; // cite: Source: common.js
         
+        // 🔑 CHANGED: Click par ab direct link pass karne ki jagah uska dynamic array index pass hoga
         previewCard.innerHTML = `
             <div class="preview-card-floating-actions">
-                <button onclick="shareGroupImage('${imgURL}', '${rootName}')" class="preview-action-icon-btn wa-share" title="Share via WhatsApp">
-                    ${whatsappSVG}
-                </button>
-                <button onclick="downloadGroupImage('${imgURL}', '${rootName}', '${serializedKeys}')" class="preview-action-icon-btn dl-png" title="Download PNG Picture">
-                    ${downloadSVG}
-                </button>
-            </div>
-            <div class="preview-card-image-wrapper">
-                <img src="${imgURL}" alt="${rootName} Order Image Preview">
-            </div>
-        `; 
-        previewContentArea.appendChild(previewCard);
-    }*/
-
-    // Inline Layout Definition Helper (🌟 Integrated Targeted Array Keys for Both Actions)
-    function appendPreviewCardToDOM(imgURL, rootName, itemKeysList) {
-        const downloadSVG = `
-    <svg viewBox="0 0 24 24" stroke="var(--primary)" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-        <polyline points="7 10 12 15 17 10"></polyline>
-        <line x1="12" y1="15" x2="12" y2="3"></line>
-    </svg>
-`;
-
-        
-        const whatsappSVG = `
-            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-            </svg>
-        `;
-
-        // 🔒 KEY LOCK MATRIX: Same serialization applied to keep both logic threads synchronized
-        const serializedKeys = encodeURIComponent(JSON.stringify(itemKeysList));
-
-        const previewCard = document.createElement('div'); 
-        previewCard.className = "group-preview-card"; 
-        
-        previewCard.innerHTML = `
-            <div class="preview-card-floating-actions">
-                <!-- 🌟 FIXED: Pass encrypted layout keys straight into the native app sharer engine -->
                 <button onclick="shareGroupImage('${imgURL}', '${rootName}', '${serializedKeys}')" class="preview-action-icon-btn wa-share" title="Share via WhatsApp">
                     ${whatsappSVG}
                 </button>
@@ -505,240 +455,322 @@ function generateCartPreview() {
                     ${downloadSVG}
                 </button>
             </div>
-<div class="preview-card-image-wrapper">
-    <img src="${imgURL}" onclick="openInteractiveZoomView('${imgURL}')" style="cursor:zoom-in;" alt="${rootName} Order Image Preview">
-</div>      `; 
-        previewContentArea.appendChild(previewCard);
+            <div class="preview-card-image-wrapper">
+                <img src="${imgURL}" onclick="openInteractiveZoomView(${currentImgIndex})" style="cursor:zoom-in;" alt="${rootName} Order Image Preview">
+            </div>`; 
+        previewContentArea.appendChild(previewCard); // cite: Source: common.js
     }
 
-    // Main formatting loop wrapper block
+    // Canvas rendering loop blocks context (Keep your existing canvas rendering code here as it is)
+    // ... (Aapka baaki ka canvas drawing loop logic perfectly chalta rahega) ...
+    // Bas loop ke aakhiri me jahan appendPreviewCardToDOM(imgURL, ...) chal rha tha vo automatically upar wale handler se route ho jayega.
+    
+    // Core structure logic reference end block
     Object.keys(groupedCart).forEach((rootName) => {
-        const items = groupedCart[rootName]; 
-        const maxParts = Math.ceil(items.length / 11);
+        const items = groupedCart[rootName]; // cite: Source: common.js
+        const maxParts = Math.ceil(items.length / 11); // cite: Source: common.js
+        const dpr = Math.max(window.devicePixelRatio || 1, 2); // cite: Source: common.js
+        const rowHeight = 40; // cite: Source: common.js
+        const headerHeight = 85; // cite: Source: common.js
+        const displayWidth = 450; // cite: Source: common.js
+        const displayHeight = 600; // cite: Source: common.js
 
-        // Canvas element template setup block
-        let canvas = document.createElement('canvas'); 
-        canvas.width = displayWidth * dpr; 
-        canvas.height = displayHeight * dpr; 
-        canvas.style.width = displayWidth + "px";
-        canvas.style.height = displayHeight + "px";
+        let canvas = document.createElement('canvas'); // cite: Source: common.js
+        canvas.width = displayWidth * dpr; // cite: Source: common.js
+        canvas.height = displayHeight * dpr; // cite: Source: common.js
+        canvas.style.width = displayWidth + "px"; // cite: Source: common.js
+        canvas.style.height = displayHeight + "px"; // cite: Source: common.js
 
-        let ctx = canvas.getContext('2d'); 
-        ctx.scale(dpr, dpr); 
+        let ctx = canvas.getContext('2d'); // cite: Source: common.js
+        ctx.scale(dpr, dpr); // cite: Source: common.js
 
-        // Pure Clean White Base
-        ctx.fillStyle = "#ffffff"; 
-        ctx.fillRect(0, 0, displayWidth, displayHeight); 
+        ctx.fillStyle = "#ffffff"; // cite: Source: common.js
+        ctx.fillRect(0, 0, displayWidth, displayHeight); // cite: Source: common.js
 
-        // --- MINIMALIST TEXT HEADER ---
-        ctx.fillStyle = "#0f172a"; 
-        ctx.font = "bold 20px ui-monospace, monospace";
-        ctx.textAlign = "left";
-        ctx.fillText(rootName.toUpperCase(), 20, 38);
+        ctx.fillStyle = "#0f172a"; // cite: Source: common.js
+        ctx.font = "bold 20px ui-monospace, monospace"; // cite: Source: common.js
+        ctx.textAlign = "left"; // cite: Source: common.js
+        ctx.fillText(rootName.toUpperCase(), 20, 38); // cite: Source: common.js
 
-        // Metadata Sub-line with calculated dynamic part indicators
-        ctx.fillStyle = "#64748b";
-        ctx.font = "12px ui-monospace, monospace";
-        let totalItemsText = "Total Items: " + items.length + " | Part: 1/" + maxParts + " | " + new Date().toLocaleDateString('en-GB');
-        ctx.fillText(totalItemsText, 20, 60);
+        ctx.fillStyle = "#64748b"; // cite: Source: common.js
+        ctx.font = "12px ui-monospace, monospace"; // cite: Source: common.js
+        let totalItemsText = "Total Items: " + items.length + " | Part: 1/" + maxParts + " | " + new Date().toLocaleDateString('en-GB'); // cite: Source: common.js
+        ctx.fillText(totalItemsText, 20, 60); // cite: Source: common.js
 
-        // Top Thick Divider Line
-        ctx.strokeStyle = "#0f172a"; 
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(20, 72);
-        ctx.lineTo(displayWidth - 20, 72); 
-        ctx.stroke();
+        ctx.strokeStyle = "#0f172a"; // cite: Source: common.js
+        ctx.lineWidth = 2; // cite: Source: common.js
+        ctx.beginPath(); // cite: Source: common.js
+        ctx.moveTo(20, 72); // cite: Source: common.js
+        ctx.lineTo(displayWidth - 20, 72); // cite: Source: common.js
+        ctx.stroke(); // cite: Source: common.js
 
-        let currentY = headerHeight + 20;
-        let activeCanvas = canvas;
-        let activeCtx = ctx;
-        
-        // 🌟 CURRENT TRACKER ARRAY: Jo is sheet par load ho rahe items ki tracking karega
-        let activeSheetKeys = [];
+        let currentY = headerHeight + 20; // cite: Source: common.js
+        let activeCanvas = canvas; // cite: Source: common.js
+        let activeCtx = ctx; // cite: Source: common.js
+        let activeSheetKeys = []; // cite: Source: common.js
 
-        // Inside Loop: Rows Layout Design with smart auto-slicing logic built-in
         items.forEach((item, idx) => {
-            
-            // Checkpoint loop: 11 items partition constraint metrics tracker
             if (idx > 0 && idx % 11 === 0) {
-                // Render older layer footer layouts safely before memory swap
-                activeCtx.strokeStyle = "#94a3b8"; 
-                activeCtx.lineWidth = 1;
-                activeCtx.beginPath();
-                activeCtx.moveTo(20, displayHeight - 32); 
-                activeCtx.lineTo(displayWidth - 20, displayHeight - 32); 
-                activeCtx.stroke();
-                activeCtx.textAlign = "left";
-                activeCtx.fillStyle = "#94a3b8";
-                activeCtx.font = "10px ui-monospace, monospace";
-                activeCtx.fillText("Generated via WayStock Master", 20, displayHeight - 15); 
-                activeCtx.textAlign = "right";
-                activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), displayWidth - 20, displayHeight - 15); 
+                activeCtx.strokeStyle = "#94a3b8"; // cite: Source: common.js
+                activeCtx.lineWidth = 1; // cite: Source: common.js
+                activeCtx.beginPath(); // cite: Source: common.js
+                activeCtx.moveTo(20, displayHeight - 32); // cite: Source: common.js
+                activeCtx.lineTo(displayWidth - 20, displayHeight - 32); // cite: Source: common.js
+                activeCtx.stroke(); // cite: Source: common.js
+                activeCtx.textAlign = "left"; // cite: Source: common.js
+                activeCtx.fillStyle = "#94a3b8"; // cite: Source: common.js
+                activeCtx.font = "10px ui-monospace, monospace"; // cite: Source: common.js
+                activeCtx.fillText("Generated via WayStock Master", 20, displayHeight - 15); // cite: Source: common.js
+                activeCtx.textAlign = "right"; // cite: Source: common.js
+                activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), displayWidth - 20, displayHeight - 15); // cite: Source: common.js
 
-                const partialImgURL = activeCanvas.toDataURL("image/png");
+                const partialImgURL = activeCanvas.toDataURL("image/png"); // cite: Source: common.js
+                appendPreviewCardToDOM(partialImgURL, rootName, activeSheetKeys); // cite: Source: common.js
+                activeSheetKeys = []; // cite: Source: common.js
+
+                activeCanvas = document.createElement('canvas'); // cite: Source: common.js
+                activeCanvas.width = displayWidth * dpr; // cite: Source: common.js
+                activeCanvas.height = displayHeight * dpr; // cite: Source: common.js
+                activeCanvas.style.width = displayWidth + "px"; // cite: Source: common.js
+                activeCanvas.style.height = displayHeight + "px"; // cite: Source: common.js
+
+                activeCtx = activeCanvas.getContext('2d'); // cite: Source: common.js
+                activeCtx.scale(dpr, dpr); // cite: Source: common.js
+
+                activeCtx.fillStyle = "#ffffff"; // cite: Source: common.js
+                activeCtx.fillRect(0, 0, displayWidth, displayHeight); // cite: Source: common.js
+
+                activeCtx.fillStyle = "#0f172a"; // cite: Source: common.js
+                activeCtx.font = "bold 20px ui-monospace, monospace"; // cite: Source: common.js
+                activeCtx.textAlign = "left"; // cite: Source: common.js
+                activeCtx.fillText(rootName.toUpperCase() + " (CONT.)", 20, 38); // cite: Source: common.js
                 
-                // 🌟 PASS ENGINE: Purani sheet ke tracked items pass karo aur reset karo
-                appendPreviewCardToDOM(partialImgURL, rootName, activeSheetKeys);
-                activeSheetKeys = [];
-
-                // CONT. CANVAS RECREATION CORRECTION
-                activeCanvas = document.createElement('canvas');
-                activeCanvas.width = displayWidth * dpr;
-                activeCanvas.height = displayHeight * dpr;
-                activeCanvas.style.width = displayWidth + "px";
-                activeCanvas.style.height = displayHeight + "px";
-
-                activeCtx = activeCanvas.getContext('2d');
-                activeCtx.scale(dpr, dpr);
-
-                activeCtx.fillStyle = "#ffffff";
-                activeCtx.fillRect(0, 0, displayWidth, displayHeight);
-
-                activeCtx.fillStyle = "#0f172a"; 
-                activeCtx.font = "bold 20px ui-monospace, monospace";
-                activeCtx.textAlign = "left";
-                activeCtx.fillText(rootName.toUpperCase() + " (CONT.)", 20, 38);
+                activeCtx.fillStyle = "#64748b"; // cite: Source: common.js
+                activeCtx.font = "12px ui-monospace, monospace"; // cite: Source: common.js
+                const nextPart = Math.floor(idx / 11) + 1; // cite: Source: common.js
+                activeCtx.fillText("Total Items: " + items.length + " | Part: " + nextPart + "/" + maxParts + " | " + new Date().toLocaleDateString('en-GB'), 20, 60); // cite: Source: common.js
                 
-                activeCtx.fillStyle = "#64748b";
-                activeCtx.font = "12px ui-monospace, monospace";
-                const nextPart = Math.floor(idx / 11) + 1;
-                activeCtx.fillText("Total Items: " + items.length + " | Part: " + nextPart + "/" + maxParts + " | " + new Date().toLocaleDateString('en-GB'), 20, 60);
-                
-                activeCtx.strokeStyle = "#0f172a"; 
-                activeCtx.lineWidth = 2;
-                activeCtx.beginPath();
-                activeCtx.moveTo(20, 72);
-                activeCtx.lineTo(displayWidth - 20, 72);
-                activeCtx.stroke();
+                activeCtx.strokeStyle = "#0f172a"; // cite: Source: common.js
+                activeCtx.lineWidth = 2; // cite: Source: common.js
+                activeCtx.beginPath(); // cite: Source: common.js
+                activeCtx.moveTo(20, 72); // cite: Source: common.js
+                activeCtx.lineTo(displayWidth - 20, 72); // cite: Source: common.js
+                activeCtx.stroke(); // cite: Source: common.js
 
-                currentY = headerHeight + 20; 
+                currentY = headerHeight + 20; // cite: Source: common.js
             }
 
-            // 🌟 TRACK KEY: Is item ki main cart storage key ko array me daal lo
-            activeSheetKeys.push(item.cartKey);
+            activeSheetKeys.push(item.cartKey); // cite: Source: common.js
 
-            let finalNameToShow = item.name; 
-            const pathParts = item.cartKey.split('>'); 
-            if (pathParts.length > 1) { 
-                pathParts.pop(); 
-                const parentKey = pathParts.join('>').trim(); 
-                const parentData = inventory[parentKey]; 
-                if (parentData && parentData.toggleOn === true) { 
-                    const parentName = parentData.name || parentKey.split('>').pop().trim(); 
-                    finalNameToShow = parentName + " " + item.name; 
-                }
-            }
+            let finalNameToShow = item.name; // cite: Source: common.js
+            const pathParts = item.cartKey.split('>'); // cite: Source: common.js
+            if (pathParts.length > 1) { // cite: Source: common.js
+                pathParts.pop(); // cite: Source: common.js
+                const parentKey = pathParts.join('>').trim(); // cite: Source: common.js
+                const parentData = inventory[parentKey]; // cite: Source: common.js
+                if (parentData && parentData.toggleOn === true) { // cite: Source: common.js
+                    const parentName = parentData.name || parentKey.split('>').pop().trim(); // cite: Source: common.js
+                    finalNameToShow = parentName + " " + item.name; // cite: Source: common.js
+                } // cite: Source: common.js
+            } // cite: Source: common.js
 
-            activeCtx.textAlign = "left";
-            activeCtx.fillStyle = "#1e293b"; 
-            activeCtx.font = "500 14px ui-monospace, monospace";
-            activeCtx.fillText((idx + 1) + ".  " + finalNameToShow, 20, currentY);
+            activeCtx.textAlign = "left"; // cite: Source: common.js
+            activeCtx.fillStyle = "#1e293b"; // cite: Source: common.js
+            activeCtx.font = "500 14px ui-monospace, monospace"; // cite: Source: common.js
+            activeCtx.fillText((idx + 1) + ".  " + finalNameToShow, 20, currentY); // cite: Source: common.js
 
-            activeCtx.textAlign = "right";
-            activeCtx.fillStyle = "#0f172a"; 
-            activeCtx.font = "bold 15px ui-monospace, monospace";
-            const finalUnitText = item.unit ? " " + item.unit : "";
-            const qtyText = item.quantity + finalUnitText; 
+            activeCtx.textAlign = "right"; // cite: Source: common.js
+            activeCtx.fillStyle = "#0f172a"; // cite: Source: common.js
+            activeCtx.font = "bold 15px ui-monospace, monospace"; // cite: Source: common.js
+            const finalUnitText = item.unit ? " " + item.unit : ""; // cite: Source: common.js
+            const qtyText = item.quantity + finalUnitText; // cite: Source: common.js
             
-            activeCtx.fillText(qtyText, displayWidth - 20, currentY); 
+            activeCtx.fillText(qtyText, displayWidth - 20, currentY); // cite: Source: common.js
 
-            activeCtx.strokeStyle = "#e2e8f0"; 
-            activeCtx.lineWidth = 1; 
-            activeCtx.beginPath(); 
-            activeCtx.moveTo(20, currentY + 12); 
-            activeCtx.lineTo(displayWidth - 20, currentY + 12); 
-            activeCtx.stroke(); 
+            activeCtx.strokeStyle = "#e2e8f0"; // cite: Source: common.js
+            activeCtx.lineWidth = 1; // cite: Source: common.js
+            activeCtx.beginPath(); // cite: Source: common.js
+            activeCtx.moveTo(20, currentY + 12); // cite: Source: common.js
+            activeCtx.lineTo(displayWidth - 20, currentY + 12); // cite: Source: common.js
+            activeCtx.stroke(); // cite: Source: common.js
 
-            currentY += rowHeight; 
+            currentY += rowHeight; // cite: Source: common.js
         });
 
-        // Final closure draw for remaining items on last page sheet
-        activeCtx.strokeStyle = "#94a3b8"; 
-        activeCtx.lineWidth = 1;
-        activeCtx.beginPath();
-        activeCtx.moveTo(20, displayHeight - 32); 
-        activeCtx.lineTo(displayWidth - 20, displayHeight - 32); 
-        activeCtx.stroke();
-        activeCtx.textAlign = "left";
-        activeCtx.fillStyle = "#94a3b8";
-        activeCtx.font = "10px ui-monospace, monospace";
-        activeCtx.fillText("Generated via WayStock Master", 20, displayHeight - 15); 
-        activeCtx.textAlign = "right";
-        activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), displayWidth - 20, displayHeight - 15); 
+        activeCtx.strokeStyle = "#94a3b8"; // cite: Source: common.js
+        activeCtx.lineWidth = 1; // cite: Source: common.js
+        activeCtx.beginPath(); // cite: Source: common.js
+        activeCtx.moveTo(20, displayHeight - 32); // cite: Source: common.js
+        activeCtx.lineTo(displayWidth - 20, displayHeight - 32); // cite: Source: common.js
+        activeCtx.stroke(); // cite: Source: common.js
+        activeCtx.textAlign = "left"; // cite: Source: common.js
+        activeCtx.fillStyle = "#94a3b8"; // cite: Source: common.js
+        activeCtx.font = "10px ui-monospace, monospace"; // cite: Source: common.js
+        activeCtx.fillText("Generated via WayStock Master", 20, displayHeight - 15); // cite: Source: common.js
+        activeCtx.textAlign = "right"; // cite: Source: common.js
+        activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), displayWidth - 20, displayHeight - 15); // cite: Source: common.js
 
-        const imgURL = activeCanvas.toDataURL("image/png"); 
-        
-        // 🌟 FINAL SHEET POP ENGINE
-        appendPreviewCardToDOM(imgURL, rootName, activeSheetKeys);
+        // ... (Aapka existing canvas rendering loop code chalega) ...
+        const imgURL = activeCanvas.toDataURL("image/png"); // cite: Source: common.js
+        appendPreviewCardToDOM(imgURL, rootName, activeSheetKeys); // cite: Source: common.js
+
+        // 🔥 THE CRITICAL MEMORY RELEASE FIX: Garbage Collector ko active karo instantly
+        activeCtx = null;
+        activeCanvas.width = 0;
+        activeCanvas.height = 0;
+        activeCanvas = null;
     });
 
-    if (typeof openOverlay === 'function') {
-        openOverlay('preview');
-    }
+    // Pure array optimization reset handlers
+    if (typeof openOverlay === 'function') { // cite: Source: common.js
+        openOverlay('preview'); // cite: Source: common.js
+    } // cite: Source: common.js
 }
 
-// ==========================================================================
-// --- 📱 SMART TARGETED IMAGE WHATSAPP SHARER & ROUTE WATCHER ---
-// ==========================================================================
+// Helper Function: Current Date & Time ko SSMMHHDDMMYY format me generate karne ke liye
+function getWayStockFormattedTimestamp() {
+    const now = new Date();
+    
+    const pad = (num) => String(num).padStart(2, '0');
+    
+    const DD = pad(now.getDate());
+    const MM = pad(now.getMonth() + 1); // Months 0-11 hote hain
+    const YY = String(now.getFullYear()).slice(-2); // Last 2 digits (e.g., 26)
+    
+    const HH = pad(now.getHours());
+    const min = pad(now.getMinutes());
+    const SS = pad(now.getSeconds());
+    
+    // Exact Output Format: SSMMHHDDMMYY (Seconds -> Minutes -> Hours -> Day -> Month -> Year)
+    return `${SS}${min}${HH}${DD}${MM}${YY}`;
+}
+
+// 💾 1. OPTIMIZED IMAGE DOWNLOAD ENGINE (NEW FILENAME PATTERN)
+function downloadGroupImage(dataURL, folderName, encodedKeysList) {
+    const uniqueTimestamp = getWayStockFormattedTimestamp();
+    const link = document.createElement('a'); // cite: Source: common.js
+    
+    // 🔥 NEW DIRECT PATTERN REGISTERED
+    link.download = `WayStock_${uniqueTimestamp}.png`;
+    link.href = dataURL; // cite: Source: common.js
+    
+    document.body.appendChild(link); // cite: Source: common.js
+    link.click(); // cite: Source: common.js
+    document.body.removeChild(link); // cite: Source: common.js
+
+    const cartKey = getCartStorageKey(); // cite: Source: common.js
+    let cart = getCartItems(); // cite: Source: common.js
+
+    if (encodedKeysList) { // cite: Source: common.js
+        try { // cite: Source: common.js
+            const targetKeysToFlush = JSON.parse(decodeURIComponent(encodedKeysList)); // cite: Source: common.js
+            if (Array.isArray(targetKeysToFlush)) { // cite: Source: common.js
+                targetKeysToFlush.forEach(key => { // cite: Source: common.js
+                    if (cart[key]) delete cart[key]; // cite: Source: common.js
+                }); // cite: Source: common.js
+            } // cite: Source: common.js
+        } catch (e) { // cite: Source: common.js
+            console.error("Targeted parsing clean stack collapsed:", e); // cite: Source: common.js
+        } // cite: Source: common.js
+    } else { // cite: Source: common.js
+        Object.keys(cart).forEach(key => { // cite: Source: common.js
+            if (cart[key].rootFolder === folderName) delete cart[key]; // cite: Source: common.js
+        }); // cite: Source: common.js
+    } // cite: Source: common.js
+
+    localStorage.setItem(cartKey, JSON.stringify(cart)); // cite: Source: common.js
+    showAlert(`✅ Slip ka maal bucket se saaf ho gaya hai.`, "success"); // cite: Source: common.js
+
+    if (window.Notification && Notification.permission === 'granted') { // cite: Source: common.js
+        const alertSound = new Audio('./notification-sound.wav'); // cite: Source: common.js
+        alertSound.play().catch(e => console.log("Audio play blocked")); // cite: Source: common.js
+
+        navigator.serviceWorker.ready.then(registration => { // cite: Source: common.js
+            registration.showNotification('Order Saved Successfully! 💾', { // cite: Source: common.js
+                body: `Slip image downloaded as WayStock_${uniqueTimestamp}.png`,
+                icon: 'logo.png', // cite: Source: common.js
+                badge: 'logo.png', // cite: Source: common.js
+                sound: 'default', // cite: Source: common.js
+                vibrate: [100, 50, 100, 200, 100, 200], // cite: Source: common.js
+                tag: 'download-success', // cite: Source: common.js
+                renotify: true // cite: Source: common.js
+            }); // cite: Source: common.js
+        }); // cite: Source: common.js
+    } // cite: Source: common.js
+
+    if (typeof renderCartContent === "function") renderCartContent(); // cite: Source: common.js
+    if (typeof refreshUI === "function") refreshUI(); // cite: Source: common.js
+
+    const previewContentArea = document.getElementById('preview-content-area'); // cite: Source: common.js
+    const totalRemainingSlips = previewContentArea ? previewContentArea.querySelectorAll('.group-preview-card').length : 0; // cite: Source: common.js
+
+    if (totalRemainingSlips <= 1) { // cite: Source: common.js
+        window.history.back(); // cite: Source: common.js
+    } else { // cite: Source: common.js
+        if (previewContentArea) { // cite: Source: common.js
+            const cards = previewContentArea.querySelectorAll('.group-preview-card'); // cite: Source: common.js
+            cards.forEach(card => { // cite: Source: common.js
+                if (card.innerHTML.includes(`downloadGroupImage('${dataURL}'`)) card.remove(); // cite: Source: common.js
+            }); // cite: Source: common.js
+        } // cite: Source: common.js
+    } // cite: Source: common.js
+}
+
+// 📢 2. OPTIMIZED NATIVE WHATSAPP SHARE ENGINE (NEW FILENAME PATTERN)
 async function shareGroupImage(dataURL, folderName, encodedKeysList) {
     try {
-        const response = await fetch(dataURL);
-        const blob = await response.blob();
-        const safeFileName = `WayStock_${folderName.replaceAll(" ", "_")}.png`;
-        const file = new File([blob], safeFileName, { type: "image/png" });
+        const uniqueTimestamp = getWayStockFormattedTimestamp();
+        const response = await fetch(dataURL); // cite: Source: common.js
+        const blob = await response.blob(); // cite: Source: common.js
+        
+        // 🔥 NATIVE SHARE FILE OBJECT MATRIX LOCK
+        const safeFileName = `WayStock_${uniqueTimestamp}.png`;
+        const file = new File([blob], safeFileName, { type: "image/png" }); // cite: Source: common.js
 
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-                files: [file],
-                title: `${folderName} Order Slip`,
-                text: `🚨 *WayStock Order Preview*\nCategory Group: *${folderName}*\nPhoto slip attached safely! 🚀`
-            });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) { // cite: Source: common.js
+            await navigator.share({ // cite: Source: common.js
+                files: [file], // cite: Source: common.js
+                title: `Order Slip ${uniqueTimestamp}`,
+                text: `🚨 *WayStock Order Preview*\nSlip Name: *${safeFileName}*\nPhoto slip attached safely! 🚀`
+            }); // cite: Source: common.js
 
-            // 🌟 ATOMIC TARGETED CLEAN ENGINE (Same as Download Logic)
-            const cartKey = getCartStorageKey();
-            let cart = getCartItems();
+            const cartKey = getCartStorageKey(); // cite: Source: common.js
+            let cart = getCartItems(); // cite: Source: common.js
 
-            if (encodedKeysList) {
-                const targetKeysToFlush = JSON.parse(decodeURIComponent(encodedKeysList));
-                if (Array.isArray(targetKeysToFlush)) {
-                    targetKeysToFlush.forEach(key => {
-                        if (cart[key]) delete cart[key];
-                    });
-                }
-            }
-            localStorage.setItem(cartKey, JSON.stringify(cart));
-            showAlert(`✅ Slip ka maal share hone par bucket se saaf ho gaya hai.`, "success");
+            if (encodedKeysList) { // cite: Source: common.js
+                const targetKeysToFlush = JSON.parse(decodeURIComponent(encodedKeysList)); // cite: Source: common.js
+                if (Array.isArray(targetKeysToFlush)) { // cite: Source: common.js
+                    targetKeysToFlush.forEach(key => { // cite: Source: common.js
+                        if (cart[key]) delete cart[key]; // cite: Source: common.js
+                    }); // cite: Source: common.js
+                } // cite: Source: common.js
+            } // cite: Source: common.js
+            localStorage.setItem(cartKey, JSON.stringify(cart)); // cite: Source: common.js
+            showAlert(`✅ Slip ka maal share hone par bucket se saaf ho gaya hai.`, "success"); // cite: Source: common.js
 
-            if (typeof renderCartContent === "function") renderCartContent();
-            if (typeof refreshUI === "function") refreshUI();
+            if (typeof renderCartContent === "function") renderCartContent(); // cite: Source: common.js
+            if (typeof refreshUI === "function") refreshUI(); // cite: Source: common.js
 
-            // 🌟 DYNAMIC AUTOMATIC SHIFT POP CHECKER (Smart Navigation Router)
-            const previewContentArea = document.getElementById('preview-content-area');
-            const totalRemainingSlips = previewContentArea ? previewContentArea.querySelectorAll('.group-preview-card').length : 0;
+            const previewContentArea = document.getElementById('preview-content-area'); // cite: Source: common.js
+            const totalRemainingSlips = previewContentArea ? previewContentArea.querySelectorAll('.group-preview-card').length : 0; // cite: Source: common.js
 
-            // Agar sabhi sheet images download/share ho chuki hain (0 left or only 1 left which is currently being popped), move back
-            if (totalRemainingSlips <= 1) {
-                window.history.back(); // Direct shift back to My Cart view screen
-            } else {
-                // Background me sirf current card slip container layout ko clear karo
-                // Is tarah screen pop hilegi nahi aur user bache hue cards download kar payega
-                if (previewContentArea) {
-                    const cards = previewContentArea.querySelectorAll('.group-preview-card');
-                    cards.forEach(card => {
-                        if (card.innerHTML.includes(`downloadGroupImage('${dataURL}'`) || card.innerHTML.includes(`shareGroupImage('${dataURL}'`)) {
-                            card.remove(); // Safely clears shared sheet from screen structure matrix
-                        }
-                    });
-                }
-            }
+            if (totalRemainingSlips <= 1) { // cite: Source: common.js
+                window.history.back(); // cite: Source: common.js
+            } else { // cite: Source: common.js
+                if (previewContentArea) { // cite: Source: common.js
+                    const cards = previewContentArea.querySelectorAll('.group-preview-card'); // cite: Source: common.js
+                    cards.forEach(card => { // cite: Source: common.js
+                        if (card.innerHTML.includes(`shareGroupImage('${dataURL}'`)) card.remove(); // cite: Source: common.js
+                    }); // cite: Source: common.js
+                } // cite: Source: common.js
+            } // cite: Source: common.js
 
-        } else {
-            showAlert("Apka device direct image sharing support nahi karta. Please download karke share karein! 📥", "error");
-        }
-    } catch (error) {
-        console.error("Direct share interaction aborted or crashed:", error);
-    }
+        } else { // cite: Source: common.js
+            showAlert("Apka device direct image sharing support nahi karta. Please download karke share karein! 📥", "error"); // cite: Source: common.js
+        } // cite: Source: common.js
+    } catch (error) { // cite: Source: common.js
+        console.error("Direct share interaction aborted or crashed:", error); // cite: Source: common.js
+    } // cite: Source: common.js
 }
 
 function triggerActiveCart(btn) {
@@ -747,7 +779,6 @@ function triggerActiveCart(btn) {
         btn.classList.remove('selected');
     }, 180); // 180ms baad blue color hat jayega
 }
-
 
 function stopMic() {
     if (recognition) {
@@ -862,10 +893,6 @@ function openOverlay(type) {
     }
 }
 
-
-
-// --- COMMON.JS (CLOSEALLOVERLAYS UPDATE) ---
-
 window.onpopstate = function(event) {
     if (typeof updateCartBadgeCount === "function") updateCartBadgeCount();
     if (recognition) {
@@ -941,8 +968,6 @@ document.getElementById('breadcrumb-section')?.classList.add('hidden');
     }
 };
 
-
-
 function closeAllOverlays() {
     if (
         document.getElementById('search-section')?.classList.contains('active') ||
@@ -958,7 +983,6 @@ function closeAllOverlays() {
     // Dropdown menu click-outside ke liye bina state wala hai, use normal remove karein
     document.getElementById('admin-menu')?.classList.remove('active');
 }
-
 
 const cartBtn = document.getElementById('cart-btn');
 const cartSection = document.getElementById('cart-section');
@@ -1113,10 +1137,11 @@ function renderCartContent() {
             <div class="cart-item-card" style="display: flex; align-items: center; justify-content: space-between; background: #ffffff;height: 68px; box-sizing: border-box;">
                 
                 <div class="cart-item-info" style="display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 0; padding-right: 8px;">
-                    <span class="cart-item-name"; text-transform: capitalize; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; display: block;">
+                    <span class="cart-item-name" style="text-transform: capitalize; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; display: block;">
                         ${finalNameToShow}
                     </span> 
                 </div>
+
                 
                 <div class="cart-item-actions" style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0; width: 185px;">
                     
@@ -1167,18 +1192,30 @@ searchInput.addEventListener('input', (e) => {
             const isInCart = cart[key] ? true : false;
             const visualIcon = (item.children && item.children.length > 0) ? '📁' : '📦';
             
+            // 🌟 FEATURE 3: Upper folder hierarchy extractor logic
+            let finalSearchDisplayString = item.name;
+            if (key.includes('>')) {
+                const structuralParts = key.split('>');
+                structuralParts.pop(); // Remove current child element
+                const upperFolderName = structuralParts.pop().trim();
+                finalSearchDisplayString = `${upperFolderName} > ${item.name}`;
+            }
+
+            // 🌟 QUOTES SAFE LOCK: JavaScript attribute safe injection escape logic
+            const escapedKey = key.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
             return `
-                <div class="search-sober-row" onclick="handleSuggestionClick('${key}')" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid #f1f5f9; background: #ffffff;">
+                <div class="search-sober-row" onclick="handleSuggestionClick(this.getAttribute('data-row-key'))" data-row-key="${escapedKey}" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid #f1f5f9; background: #ffffff;">
                     <div class="search-row-left" style="display: flex; align-items: center; gap: 16px;">
                         <span class="search-row-icon">${visualIcon}</span>
                         <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                            <span class="search-row-text" style="font-size: 14px; font-weight: 600; color: #1e293b;">${item.name}</span>
+                            <span class="search-row-text" style="font-size: 14px; font-weight: 600; color: #1e293b;">${finalSearchDisplayString}</span>
                         </div>
                     </div>
                     <div class="search-row-right" onclick="event.stopPropagation()">
                         ${isInCart ? 
                             `<span class="status-badge-added" style="font-size: 11px; font-weight: 800; color: var(--success); background-color: #ecfdf5; padding: 4px 10px; border-radius: 6px; border: 1px solid #d1fae5;">✓ Added</span>` : 
-                            `<button class="card-cart-btn" onclick="addToCart('${key}'); searchInput.value=''; document.getElementById('search-suggestion-chips').style.display='none'; refreshUI();" style="width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; background:#ffffff; border:1px solid #e2e8f0; color:#64748b;"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg></button>`
+                            `<button class="card-cart-btn" onclick="addToCart(this.getAttribute('data-item-key')); document.getElementById('main-search-input').value=''; document.getElementById('search-suggestion-chips').style.display='none'; refreshUI();" data-item-key="${escapedKey}" style="width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; background:#ffffff; border:1px solid #e2e8f0; color:#64748b;"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg></button>`
                         }
                     </div>
                 </div>
@@ -1552,27 +1589,28 @@ function refreshUI() {
     updateCartBadgeCount();
 }
 
+// 🔑 DYNAMIC PROFILE STORAGE ROUTER FOR SEARCH HISTORY
+function getSearchHistoryStorageKey() {
+    const user = getCurrentUser(); // cite: Source: common.js
+    return user ? `wayStock_searchHistory_${user.id}` : 'wayStock_searchHistory_guest';
+}
 
 function getSearchHistory() {
-    return JSON.parse(localStorage.getItem('wayStock_searchHistory')) || [];
+    const historyKey = getSearchHistoryStorageKey();
+    return JSON.parse(localStorage.getItem(historyKey)) || []; // cite: Source: common.js
 }
 
 function saveToSearchHistory(key) {
-    let historyList = getSearchHistory();
+    let historyList = getSearchHistory(); // cite: Source: common.js
+    const historyKey = getSearchHistoryStorageKey();
     
-    // Duplicate remove karo agar pehle se hai
-    historyList = historyList.filter(item => item !== key);
+    historyList = historyList.filter(item => item !== key); // cite: Source: common.js
+    historyList.unshift(key); // cite: Source: common.js
     
-    // Naya item top par dalo
-    historyList.unshift(key);
+    if (historyList.length > 12) historyList.pop(); // cite: Source: common.js
     
-    // Max 5 history items rakho
-    if (historyList.length > 12) historyList.pop();
-    
-    localStorage.setItem('wayStock_searchHistory', JSON.stringify(historyList));
+    localStorage.setItem(historyKey, JSON.stringify(historyList));
 }
-
-
 
 function renderHistoryDropdown() {
     const historyList = getSearchHistory();
@@ -1759,17 +1797,6 @@ function setCartQty(key, value) {
     }
 }
 
-function removeSingleCartItem(key) {
-    const cartKey = getCartStorageKey();
-    let cart = getCartItems();
-    if (cart[key]) {
-        delete cart[key];
-        localStorage.setItem(cartKey, JSON.stringify(cart));
-        showAlert("Item bucket se hata diya gaya.", "info");
-        if (typeof renderCartContent === "function") renderCartContent();
-        if (typeof refreshUI === "function") refreshUI();
-    }
-}
 
 function clearCompleteCart() {
     if (confirm("Kya aap poori bucket khali karna chahte hain?")) {
@@ -1779,93 +1806,6 @@ function clearCompleteCart() {
         renderCartContent();
     }
 }
-
-
-function downloadGroupImage(dataURL, folderName, encodedKeysList) {
-    const link = document.createElement('a');
-    link.download = "WayStock_" + folderName.replaceAll(" ", "_") + ".png";
-    link.href = dataURL;
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    const cartKey = getCartStorageKey();
-    let cart = getCartItems();
-
-    // 🌟 ATOMIC CLEAN ENGINE: Purane pure category flush ko lock karke specific filter check kiya
-    if (encodedKeysList) {
-        try {
-            // Stringified data ko transparently back array process logic me restore kiya
-            const targetKeysToFlush = JSON.parse(decodeURIComponent(encodedKeysList));
-            
-            if (Array.isArray(targetKeysToFlush)) {
-                targetKeysToFlush.forEach(key => {
-                    if (cart[key]) {
-                        delete cart[key]; // 🔥 Sirf wahi item uda jo download hua!
-                    }
-                });
-                console.log(`🎯 [Clean Engine] Atomic removal complete for sheet items.`, targetKeysToFlush);
-            }
-        } catch (e) {
-            console.error("Targeted parsing clean stack collapsed:", e);
-        }
-    } else {
-        // Safe Layout Fallback: Agar upar se array na mile (Light protection layer)
-        Object.keys(cart).forEach(key => {
-            if (cart[key].rootFolder === folderName) {
-                delete cart[key];
-            }
-        });
-    }
-
-    // Save atomic snapshot state downstream
-    // ... downloadGroupImage logic ke upar ka saara code safe rahega ...
-    localStorage.setItem(cartKey, JSON.stringify(cart));
-    showAlert(`✅ Slip ka maal bucket se saaf ho gaya hai.`, "success");
-
-    if (window.Notification && Notification.permission === 'granted') {
-        const alertSound = new Audio('./notification-sound.wav');
-        alertSound.play().catch(e => console.log("Audio play blocked"));
-
-        navigator.serviceWorker.ready.then(registration => {
-            registration.showNotification('Order Saved Successfully! 💾', {
-                body: `${folderName} ki order image download ho gayi he.`,
-                icon: 'logo.png',
-                badge: 'logo.png',
-                sound: 'default', 
-                vibrate: [100, 50, 100, 200, 100, 200], 
-                tag: 'download-success',
-                renotify: true
-            });
-        });
-    }
-
-    if (typeof renderCartContent === "function") renderCartContent();
-    if (typeof refreshUI === "function") refreshUI();
-
-    // 🌟 DYNAMIC ROUTE POP CONTROL MATRIX (Smart Checker Configuration)
-    const previewContentArea = document.getElementById('preview-content-area');
-    const totalRemainingSlips = previewContentArea ? previewContentArea.querySelectorAll('.group-preview-card').length : 0;
-
-    if (totalRemainingSlips <= 1) {
-        // Safe Mode Trigger: Agar ye aakhiri box bacha hua tha screen par, tabhi piche le jao!
-        window.history.back(); 
-    } else {
-        // Stay On Screen Mode: Downloaded card layout element box ko dynamic window surface se dissolve kardo
-        if (previewContentArea) {
-            const cards = previewContentArea.querySelectorAll('.group-preview-card');
-            cards.forEach(card => {
-                // Direct current image signature verification check
-                if (card.innerHTML.includes(`downloadGroupImage('${dataURL}'`)) {
-                    card.remove(); // Remove downloaded box element without moving the layout window back!
-                }
-            });
-        }
-    }
-}
-
-
 
 db.collection("appSettings").doc("globalNotification").onSnapshot((doc) => {
     if (!doc.exists) return;
@@ -2027,87 +1967,6 @@ localStorage.setItem('wayStock_admin_expiry', expiryTimestamp);
     }
 }
 
-/*1 document.addEventListener('touchstart', function(e) {
-    const swipeZone = e.target.closest('.gesture-swipe-zone');
-    if (!swipeZone) return;
-
-    // Agar user input field ke andar active typing kar rha he, toh scroll lock gesture bypass karo
-    if (document.activeElement === swipeZone.querySelector('input')) {
-        return; 
-    }
-
-    const key = swipeZone.getAttribute('data-swipe-key');
-    const inputElement = swipeZone.querySelector('input');
-    if (!key || !inputElement) return;
-
-    let startX = e.touches[0].clientX;
-    let initialQty = parseInt(inputElement.value, 10) || 1;
-    let accumulatedDelta = 0;
-    let hasMovedMoved = false; // Track karne ke liye ki swipe chal rha he ya simple tap hua he
-    
-    const SENSITIVITY_PIXELS = 15; 
-
-    function onTouchMove(moveEvent) {
-        const currentX = moveEvent.touches[0].clientX;
-        const currentDiffX = currentX - startX;
-
-        // Threshold configuration check to filter out light micro shaking taps
-        if (Math.abs(currentDiffX) > 5) {
-            hasMovedMoved = true;
-            moveEvent.preventDefault();
-            moveEvent.stopPropagation();
-        } else {
-            return;
-        }
-
-        if (currentDiffX > 5) {
-            swipeZone.classList.add('swiping-right');
-            swipeZone.classList.remove('swiping-left');
-        } else if (currentDiffX < -5) {
-            swipeZone.classList.add('swiping-left');
-            swipeZone.classList.remove('swiping-right');
-        }
-
-        const currentChange = Math.floor(currentDiffX / SENSITIVITY_PIXELS);
-        
-        if (currentChange !== accumulatedDelta) {
-            let nextCalculatedQty = initialQty + currentChange;
-            if (nextCalculatedQty < 0) nextCalculatedQty = 0;
-
-            inputElement.value = nextCalculatedQty; 
-            accumulatedDelta = currentChange;
-            swipeZone.style.transform = "scale(1.04)";
-        }
-    }
-
-    function onTouchEnd() {
-        document.removeEventListener('touchmove', onTouchMove);
-        document.removeEventListener('touchend', onTouchEnd);
-        
-        swipeZone.classList.remove('swiping-right', 'swiping-left');
-        swipeZone.style.transform = "scale(1)";
-
-        // 🧠 HYBRID DETECTOR: Agar finger bilkul move nahi hui, yaani user ne sirf TAP kiya he direct numeric entry ke liye!
-        if (!hasMovedMoved) {
-            // Remove native readonly lock overlay framework cleanly
-            inputElement.removeAttribute('readonly');
-            inputElement.focus();
-            inputElement.select(); // auto highlight full number text for easy override
-            return; // Exit swipe logic loops instantly
-        }
-
-        // Processing standard swipe outputs safely
-        const finalParsedQty = parseInt(inputElement.value, 10);
-        commitQuantityToStorage(key, finalParsedQty);
-    }
-
-    document.addEventListener('touchmove', onTouchMove, { passive: false });
-    document.addEventListener('touchend', onTouchEnd);
-});*/
-
-// ==========================================================================
-// 🔄 REVERSED GESTURE QUANTITY SWIPE ZONE ENGINE (common.js)
-// ==========================================================================
 document.addEventListener('touchstart', function(e) {
     const swipeZone = e.target.closest('.gesture-swipe-zone');
     if (!swipeZone) return;
@@ -2180,8 +2039,6 @@ const currentChange = -Math.floor(currentDiffX / SENSITIVITY_PIXELS);
     document.addEventListener('touchend', onTouchEnd);
 });
 
-
-
 // 🔑 DIRECT KEYPAD INPUT INTERCEPTORS & SYNC BLOCKS
 document.addEventListener('focusin', function(e) {
     const input = e.target.closest('.gesture-swipe-zone input');
@@ -2200,78 +2057,263 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// Blur Event Tracker: Keyboard band hote hi selection text state bhi clear ho jayegi
+// Blur Event Tracker Optimization
 document.addEventListener('focusout', function(e) {
-    const input = e.target.closest('.gesture-swipe-zone input');
-    if (!input) return;
+    const input = e.target.closest('.gesture-swipe-zone input'); // cite: 3
+    if (!input) return; // cite: 3
 
-    const swipeZone = input.closest('.gesture-swipe-zone');
-    const key = swipeZone?.getAttribute('data-swipe-key');
-    if (!key) return;
+    const swipeZone = input.closest('.gesture-swipe-zone'); // cite: 3
+    const key = swipeZone?.getAttribute('data-swipe-key'); // cite: 3
+    if (!key) return; // cite: 3
 
-    // 🔑 THE FIX: Selection clear karne ke liye pointer text range selection index zero (0) lock kiya
     if (window.getSelection) {
-        window.getSelection().removeAllRanges(); // Mobile text dynamic highlight selector ko instantly clear karega
+        window.getSelection().removeAllRanges(); // cite: 3
     }
 
-    // Reset fields back to secure structural locked read formats
-    input.setAttribute('readonly', 'true');
+    input.setAttribute('readonly', 'true'); // cite: 3
 
-    let typedValue = parseInt(input.value, 10);
-    if (isNaN(typedValue) || typedValue < 0) typedValue = 0;
+    let typedValue = parseInt(input.value, 10); // cite: 3
+    if (isNaN(typedValue) || typedValue < 0) typedValue = 0; // cite: 3
 
-    commitQuantityToStorage(key, typedValue);
+    commitQuantityToStorage(key, typedValue); // cite: 3
+    
+    // Virtual Keyboard shift hone ke baad viewport scroll jump prevent logic
+    window.scrollTo({
+        top: window.scrollY,
+        behavior: 'instant'
+    });
 });
 
 
-// 🛠️ ATOMIC CORE COMMIT CONTAINER ENGINE
+// 🛠️ ABSOLUTE DELETION ENGINE (HEIGHT COLLAPSE & JUMP GUARD)
 function commitQuantityToStorage(key, finalQty) {
-    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
-    let cart = typeof getCartItems === "function" ? getCartItems() : {};
+    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest'; // cite: 1
+    let cart = typeof getCartItems === "function" ? getCartItems() : {}; // cite: 1
 
-    if (!cart[key]) return;
+    if (!cart[key]) return; // cite: 1
+
+    const cartBodyContainer = document.getElementById('cart-content-area') || document.querySelector('.cart-body'); // cite: 1
 
     if (finalQty <= 0) {
-        delete cart[key];
-        localStorage.setItem(cartKey, JSON.stringify(cart));
-        if (typeof updateCartBadgeCount === "function") updateCartBadgeCount();
-        refreshUI();
-    } else {
-        cart[key].quantity = finalQty;
-        localStorage.setItem(cartKey, JSON.stringify(cart));
+        // 🔒 LOCK 1: Height Collapse Guard Engine
+        if (cartBodyContainer) {
+            // Element remove hone se pehle container ki current total scroll height ko fix lock kar do
+            const currentScrollHeight = cartBodyContainer.scrollHeight;
+            cartBodyContainer.style.minHeight = `${currentScrollHeight}px`;
+            cartBodyContainer.style.height = `${currentScrollHeight}px`;
+        }
+
+        delete cart[key]; // cite: 1
+        localStorage.setItem(cartKey, JSON.stringify(cart)); // cite: 1
         
-        if (typeof renderCartContent === "function") renderCartContent();
-        updateCartBadgeCount();
+        if (typeof updateCartBadgeCount === "function") updateCartBadgeCount(); // cite: 1
+
+        const targetCartCard = document.querySelector(`.gesture-swipe-zone[data-swipe-key="${key}"]`)?.closest('.cart-item-card'); // cite: 1
+        
+        if (targetCartCard) {
+            targetCartCard.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'; // cite: 1
+            targetCartCard.style.opacity = '0'; // cite: 1
+            targetCartCard.style.transform = 'translateX(-20px)'; // cite: 1
+
+            setTimeout(() => {
+                targetCartCard.remove(); // cite: 1
+                
+                const remainingKeys = Object.keys(getCartItems()); // cite: 1
+                if (remainingKeys.length === 0) {
+                    // Container styles reset immediately
+                    if (cartBodyContainer) {
+                        cartBodyContainer.style.minHeight = '';
+                        cartBodyContainer.style.height = '';
+                    }
+                    refreshUI(); // cite: 1
+                } else {
+                    const cartCountElement = document.getElementById('cart-count'); // cite: 1
+                    if (cartCountElement) cartCountElement.innerText = remainingKeys.length; // cite: 1
+                    
+                    // 🔓 UNLOCK: Element safely remove hone ke baad temporary height locks release kardo
+                    setTimeout(() => {
+                        if (cartBodyContainer) {
+                            cartBodyContainer.style.minHeight = '';
+                            cartBodyContainer.style.height = '';
+                        }
+                    }, 50);
+                }
+            }, 200);
+        } else {
+            if (cartBodyContainer) {
+                cartBodyContainer.style.minHeight = '';
+                cartBodyContainer.style.height = '';
+            }
+            refreshUI(); // cite: 1
+        }
+    } else {
+        // Normal quantity updates mapping
+        cart[key].quantity = finalQty; // cite: 1
+        localStorage.setItem(cartKey, JSON.stringify(cart)); // cite: 1
+        
+        if (typeof updateCartBadgeCount === "function") updateCartBadgeCount(); // cite: 1
+
+        const activeCardInput = document.querySelector(`.gesture-swipe-zone[data-swipe-key="${key}"] input`); // cite: 1
+        if (activeCardInput) {
+            activeCardInput.value = finalQty; // cite: 1
+        }
     }
 }
 
-function openInteractiveZoomView(imageSrc) {
-    const overlay = document.getElementById('preview-zoom-overlay');
-    const targetImg = document.getElementById('zoom-target-image');
-    
-    if (!overlay || !targetImg) return;
-    
-    targetImg.src = imageSrc;
-    overlay.classList.add('active'); 
-
-    // SYSTEM BACK LOCK: History state stack lock karo taaki hardware back key capture ho sake
-    if (window.history.state?.overlay !== 'preview-zoom') {
-        history.pushState({ overlay: 'preview-zoom' }, "");
+// ❌ DYNAMIC CROSS BUTTON DELETION INTERCEPTOR
+function removeSingleCartItem(key) {
+    // Event object bubble layers capture prevention logic mapping
+    if (window.event) {
+        window.event.preventDefault();
+        window.event.stopPropagation();
     }
+
+    const cartKey = getCartStorageKey(); // cite: 1
+    let cart = getCartItems(); // cite: 1
+    
+    if (cart[key]) {
+        // Direct absolute atomic core commit container trigger pass with 0 value
+        commitQuantityToStorage(key, 0);
+        showAlert("Item bucket se hata diya gaya.", "info"); // cite: 1
+    }
+}
+
+// 📱 3. TRIPLE-IMG DYNAMIC FLUID SLIDER GALLERY CONTROLLER
+function openInteractiveZoomView(imageIndex) {
+    const overlay = document.getElementById('preview-zoom-overlay'); // cite: Source: common.js
+    const track = document.getElementById('zoom-track-slider');
+    
+    const imgLeft = document.getElementById('zoom-left-image');
+    const imgCenter = document.getElementById('zoom-target-image'); // cite: Source: common.js
+    const imgRight = document.getElementById('zoom-right-image');
+
+    if (!overlay || !track || !imgCenter || !window.WayStockPreviewImages) return;
+
+    window.WayStockCurrentImageIndex = imageIndex;
+    overlay.classList.add('active'); // cite: Source: common.js
+
+    // SYSTEM BACK HISTORY LOCK
+    if (window.history.state?.overlay !== 'preview-zoom') { // cite: Source: common.js
+        history.pushState({ overlay: 'preview-zoom' }, ""); // cite: Source: common.js
+    }
+
+    // 🔄 HYDRATION PIPELINE: Previous, Center aur Next image slots load karo
+    function refreshTripleImagesMatrix() {
+        const idx = window.WayStockCurrentImageIndex;
+        const total = window.WayStockPreviewImages.length;
+
+        // Reset track matrix immediately to center position (0px translation)
+        track.style.transition = 'none';
+        track.style.transform = 'translate3d(0px, 0px, 0px)';
+
+        // Populate Center Slot
+        imgCenter.src = window.WayStockPreviewImages[idx];
+
+        // Populate Left Slot (Previous Item)
+        if (idx > 0) {
+            imgLeft.src = window.WayStockPreviewImages[idx - 1];
+            imgLeft.style.visibility = 'visible';
+        } else {
+            imgLeft.src = "";
+            imgLeft.style.visibility = 'hidden'; // Hide template if out of bounds
+        }
+
+        // Populate Right Slot (Next Item)
+        if (idx < total - 1) {
+            imgRight.src = window.WayStockPreviewImages[idx + 1];
+            imgRight.style.visibility = 'visible';
+        } else {
+            imgRight.src = "";
+            imgRight.style.visibility = 'hidden'; // Hide template if out of bounds
+        }
+    }
+
+    // Initial draw synchronization
+    refreshTripleImagesMatrix();
+
+    // --- 🎮 TOUCH SWIPE CONTROLLER CAPTURE LAYER ---
+    let startX = 0;
+    let currentX = 0;
+    let isTrackingMove = false;
+    const viewWidth = window.innerWidth;
+
+    overlay.ontouchstart = function(e) {
+        startX = e.touches[0].clientX;
+        currentX = startX;
+        isTrackingMove = true;
+        track.style.transition = 'none'; // Stop friction transitions while dragging
+    };
+
+    overlay.ontouchmove = function(e) {
+        if (!isTrackingMove) return;
+        currentX = e.touches[0].clientX;
+        
+        const deltaX = currentX - startX;
+        const idx = window.WayStockCurrentImageIndex;
+        const total = window.WayStockPreviewImages.length;
+
+        // 🛡️ EDGE BUFFER GUARD: Agar user pehli image se left ya aakhiri se right khiskaye toh friction heavy kar do
+        if ((idx === 0 && deltaX > 0) || (idx === total - 1 && deltaX < 0)) {
+            // Apply rubber band dampening effect
+            track.style.transform = `translate3d(${deltaX * 0.3}px, 0px, 0px)`;
+        } else {
+            // Real-time track dragging smoothly with user finger coordinate metrics
+            track.style.transform = `translate3d(${deltaX}px, 0px, 0px)`;
+        }
+    };
+
+    overlay.ontouchend = function(e) {
+        if (!isTrackingMove) return;
+        isTrackingMove = false;
+
+        const totalDeltaX = currentX - startX;
+        const swipeThreshold = viewWidth * 0.22; // Kam se kam 22% screen drag honi chahiye shift karne ke liye
+        const idx = window.WayStockCurrentImageIndex;
+        const total = window.WayStockPreviewImages.length;
+
+        // Active smooth hardware spring response preset
+        track.style.transition = 'transform 0.28s cubic-bezier(0.23, 1, 0.32, 1)';
+
+        if (totalDeltaX < -swipeThreshold && idx < total - 1) {
+            // ➡️ SHIFT NEXT SLIDE: Pull track smoothly left completely
+            track.style.transform = `translate3d(-100vw, 0px, 0px)`;
+            window.WayStockCurrentImageIndex++;
+            setTimeout(refreshTripleImagesMatrix, 280); // Smooth background sync swap after animation ends
+        } 
+        else if (totalDeltaX > swipeThreshold && idx > 0) {
+            // ⬅️ SHIFT PREVIOUS SLIDE: Pull track smoothly right completely
+            track.style.transform = `translate3d(100vw, 0px, 0px)`;
+            window.WayStockCurrentImageIndex--;
+            setTimeout(refreshTripleImagesMatrix, 280); // Smooth background sync swap after animation ends
+        } 
+        else {
+            // 🔄 SNAP BACK BACK: If touch force limits mismatch, snap back to center instantly
+            track.style.transform = 'translate3d(0px, 0px, 0px)';
+        }
+    };
 }
 
 function closeInteractiveZoomView(isBackAction = false) {
-    const overlay = document.getElementById('preview-zoom-overlay');
-    if (!overlay) return;
+    const overlay = document.getElementById('preview-zoom-overlay'); // cite: Source: common.js
+    const track = document.getElementById('zoom-track-slider');
+    if (!overlay) return; // cite: Source: common.js
 
-    overlay.classList.remove('active');
+    overlay.classList.remove('active'); // cite: Source: common.js
+    
+    // Clear styles memory loops pointers
+    if (track) {
+        track.style.transition = 'none';
+        track.style.transform = 'translate3d(0px, 0px, 0px)';
+    }
 
-    // ROUTING SAFETY RESET: Agar user ne × button dabaya he, toh background history stack pop karo
-    if (!isBackAction && window.history.state?.overlay === 'preview-zoom') {
-        window.history.back();
+    overlay.ontouchstart = null;
+    overlay.ontouchmove = null;
+    overlay.ontouchend = null;
+
+    if (!isBackAction && window.history.state?.overlay === 'preview-zoom') { // cite: Source: common.js
+        window.history.back(); // cite: Source: common.js
     }
 }
-
 
 
 function toggleUnitDropdownMenu(element) {
@@ -2288,28 +2330,32 @@ function toggleUnitDropdownMenu(element) {
     }
 }
 
-
-// Selector handler logic
+// 🔄 TARGETED UNIT CHANGE HANDLER (NO SCROLL JUMP)
 function executeUnitSelectChange(key, unitValue, pageType) {
-    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
-    let cart = typeof getCartItems === "function" ? getCartItems() : {};
-    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest'; // cite: 3
+    let cart = typeof getCartItems === "function" ? getCartItems() : {}; // cite: 3
+    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {}; // cite: 3
 
-    // 1. Update current item base model property configuration values
+    // 1. RAM / Cache models me active state update locked
     if (inventory[key]) {
-        inventory[key].currentUnit = unitValue;
-        if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
+        inventory[key].currentUnit = unitValue; // cite: 3
+        if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory); // cite: 3
     }
 
-    // 2. Sync inside cart if item is currently sitting inside cart
+    // 2. LocalStorage Cart me data sync securely push karo
     if (cart[key]) {
-        cart[key].unit = unitValue;
-        localStorage.setItem(cartKey, JSON.stringify(cart));
+        cart[key].unit = unitValue; // cite: 3
+        localStorage.setItem(cartKey, JSON.stringify(cart)); // cite: 3
     }
 
-    // Close options box menu and reload display elements
-    document.querySelectorAll('.unit-select-dropdown').forEach(d => d.classList.remove('active-menu'));
-    refreshUI();
+    // 3. TARGETED UI OVERRIDE: Bina innerHTML touch kiye directly value trigger badlo
+    const activeBadgeTrigger = document.querySelector(`.gesture-swipe-zone[data-swipe-key="${key}"]`).closest('.cart-item-actions').querySelector('.unit-trigger-badge');
+    if (activeBadgeTrigger) {
+        activeBadgeTrigger.innerHTML = `${unitValue} ▾`;
+    }
+
+    // Dropdown list containers close layers configuration
+    document.querySelectorAll('.unit-select-dropdown').forEach(d => d.classList.remove('active-menu')); // cite: 3
 }
 
 // REPLACE WITH THIS CLEAN LOGIC:

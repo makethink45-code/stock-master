@@ -130,9 +130,6 @@ function openActionModal(type, parentKey) {
     }
 }
 
-// ==========================================================================
-// --- 🌟 FIXED ADMIN MENU ITEMS EXECUTION (WITH TIMED HISTORY SYNC) ---
-// ==========================================================================
 const menuItems = document.querySelectorAll('.menu-item');
 
 // 1. Add New Item Button
@@ -190,9 +187,6 @@ if (menuItems[2]) {
     };
 }
 
-
-
-
 window.addEventListener('DOMContentLoaded', async () => {
     // 🔑 INITIAL CLOUD SYNC: Pehle Firebase se data load karo
     if (typeof loadFirebaseData === "function") {
@@ -204,20 +198,31 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (typeof updateCartBadgeCount === "function") updateCartBadgeCount();
 });
 
+// Global memory container mapping for debounce synchronization
+window.WayStockFirebaseSyncDebounceTimer = null;
+
 function handleToggleStatus(key, isActive) {
-    // Upgraded clean reference:
-const inventory = getActiveInventory();
+    const inventory = getActiveInventory(); // cite: Source: admin-script.js
 
-    if (inventory[key]) {
-        inventory[key].toggleOn = isActive;
-        localStorage.setItem('wayStock_inventory', JSON.stringify(inventory));
+    if (inventory[key]) { // cite: Source: admin-script.js
+        inventory[key].toggleOn = isActive; // cite: Source: admin-script.js
+        localStorage.setItem('wayStock_inventory', JSON.stringify(inventory)); // cite: Source: admin-script.js
 
-        // 🔑 FIX: Double trigger hataya, ab sirf ek hi baar atomic push chalega
-        if (typeof syncToFirebase === "function") {
-            syncToFirebase(); 
+        console.log(`Saved locally: ${key} is ${isActive ? 'ON' : 'OFF'}`);
+
+        // 🔥 DEBOUNCE ENGINE: Har network click blast ko block karo
+        if (window.WayStockFirebaseSyncDebounceTimer) {
+            clearTimeout(window.WayStockFirebaseSyncDebounceTimer);
         }
-        console.log(`Saved & Synced: ${key} is ${isActive ? 'ON' : 'OFF'}`);
-    }
+
+        // Sirf tabhi cloud sync chalega jab admin clicks rok kar 1.2 seconds tak hold karega
+        window.WayStockFirebaseSyncDebounceTimer = setTimeout(() => {
+            if (typeof syncToFirebase === "function") {
+                console.log("☁️ [Debounce Engine] Committing stable batch changes to Firebase Cloud...");
+                syncToFirebase(); // cite: Source: admin-script.js
+            }
+        }, 1200); 
+    } // cite: Source: admin-script.js
 }
 
 function capitalizeWords(str) {
@@ -226,163 +231,6 @@ function capitalizeWords(str) {
     }).join(' ');
 }
 
-/*1 function processBulkData() {
-    const inputField = document.getElementById('modal-input'); //
-    const rawData = inputField.value.trim(); //
-    if (!rawData) return; //
-
-
-// Function ke andar ka EDIT MODE block is tarah update karein:
-if (isEditModeActive && editTargetKey) {
-    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
-    
-    // 🔑 MULTI-USER FIX: Get active dynamic cart key and items
-    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
-    let cart = typeof getCartItems === "function" ? getCartItems() : {};
-    
-    if (inventory[editTargetKey]) {
-        const newName = capitalizeWords(rawData); 
-        const oldName = inventory[editTargetKey].name;
-
-        inventory[editTargetKey].name = newName;
-        inventory[editTargetKey].displayName = newName;
-
-        // 🔄 DYNAMIC MY BUCKET NAME SYNC
-        Object.keys(cart).forEach(cKey => {
-            if (cKey === editTargetKey || cKey.startsWith(editTargetKey + '>')) {
-                if (cart[cKey].name === oldName) {
-                    cart[cKey].name = newName;
-                }
-            }
-        });
-
-        localStorage.setItem('wayStock_inventory', JSON.stringify(inventory));
-        if (typeof syncToFirebase === "function") syncToFirebase();
-        
-        // 🔑 FIXED: Target exact dynamic user cart storage
-        localStorage.setItem(cartKey, JSON.stringify(cart));
-        
-        showAlert("Naam successfully badal gaya aur Cart me bhi sync ho gaya! ✅", "success");
-    }
-
-    isEditModeActive = false;
-    editTargetKey = "";
-    const actionBtn = document.getElementById('modal-action-btn');
-    if (actionBtn) actionBtn.innerText = "Create Structure 🚀";
-    
-    inputField.value = ""; 
-    closeAllOverlays(); 
-    if (typeof exitSelectionMode === 'function') exitSelectionMode(); 
-    return; 
-}
-
-
-        // 🔑 STORAGE UPGRADE: Fetching dynamic inventory from RAM cache instead of local storage directly
-    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {}; 
-    
-    // 🛡️ CRITICAL BLANK LINE FILTER: Splitting by newline and filtering out any pure spaces or empty inputs instantly
-    const lines = rawData.split('\n')
-                         .map(line => line.trim())
-                         .filter(line => line.length > 0); 
-
-    if (lines.length === 0) {
-        showAlert("Oho! Kuch valid text toh likhiye structure banane ke liye. ✍️", "error");
-        return;
-    }
-
-    // === 🔴 SAFETY FILTER 1: Folder ke naam me Comma (,) check karna ===
-    let hasValidationError = false; //
-    lines.forEach((line, index) => {
-        const levels = line.split('>').map(lvl => lvl.trim()); //
-        if (levels.length > 1) { //
-            for (let i = 0; i < levels.length - 1; i++) { //
-                if (levels[i].includes(',')) { //
-                    showAlert(`Error (Line ${index + 1}): Folder ke naam "${levels[i]}" me comma (,) nahi chalega!`, "error"); //
-                    hasValidationError = true; //
-                }
-            }
-        }
-    });
-
-    if (hasValidationError) return; //
-
-    // --- MAIN PROCESSING BATCH BIND LOOP ---
-    lines.forEach(line => {
-        // Har level ko split karein aur sath hi sath Capitalize bhi kar dein (Bug 1 Fix)
-        const levels = line.split('>').map(lvl => capitalizeWords(lvl.trim())); //
-        
-        // BUG 3 FIX: targetParentForNewItem ka use karein jo + button dabaaye hue card ka actual path track rakhta hai
-        let currentParents = [targetParentForNewItem || window.currentFolder || 'root']; //
-
-        levels.forEach((levelContent, index) => {
-            const isLastLevel = (index === levels.length - 1); //
-            // Comma se split karke har item ka naam capitalize karein
-            const names = levelContent.split(',').map(n => capitalizeWords(n.trim())).filter(n => n); //
-            let nextLevelParents = []; //
-
-            currentParents.forEach(parentKey => {
-                names.forEach(originalName => {
-                    // Path generator
-                    const uniqueKey = parentKey === 'root' ? originalName : `${parentKey}>${originalName}`; //
-
-                    // BUG 2 FIX: Duplicate entry check strict karna
-                    if (inventory[parentKey] && inventory[parentKey].children.includes(uniqueKey)) { //
-                        console.log(`Duplicate blocked: ${uniqueKey} already exists under ${parentKey}`); //
-                    } else {
-                        // Agar entry nahi hai, tabhi naya block create karo
-                        if (!inventory[uniqueKey]) { //
-                            inventory[uniqueKey] = { //
-                                name: originalName, //
-                                displayName: originalName, //
-                                type: isLastLevel ? 'item' : 'folder', //
-                                parent: parentKey, //
-                                toggleOn: false, //
-                                children: [] //
-                            }; //
-                        } else if (!isLastLevel) { //
-                            inventory[uniqueKey].type = 'folder'; //
-                        }
-
-                        // Parent ke children list me unique key register karna
-                        if (inventory[parentKey] && !inventory[parentKey].children.includes(uniqueKey)) { //
-                            inventory[parentKey].children.push(uniqueKey); //
-                        }
-                    }
-
-                    if (!isLastLevel) { //
-                        nextLevelParents.push(uniqueKey); //
-                    }
-                });
-            });
-            currentParents = nextLevelParents; //
-        });
-    });
-    // Save changes safely inside IndexedDB only
-            // 🔄 Atomic commit locks to storage layers
-    if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
-    if (typeof syncToFirebase === "function") syncToFirebase();
-    
-    // 🧽 Explicitly resetting DOM element pointers to prevent memory leak retention
-    inputField.value = ""; 
-
-    // Suggestion chip container UI safety reset and visual state collapsing
-    const hintBadge = document.getElementById('bulk-smart-hint');
-    if (hintBadge) { 
-        hintBadge.style.display = 'none'; 
-        hintBadge.innerHTML = ""; 
-    }
-    
-    // Exit selection framework setups safely if active during modifications
-    isEditModeActive = false;
-    editTargetKey = "";
-    const actionBtn = document.getElementById('modal-action-btn');
-    if (actionBtn) actionBtn.innerText = "Create Structure 🚀";
-
-    closeAllOverlays(); 
-    if (typeof renderAdminInventory === "function") renderAdminInventory();
-    showAlert("Structure successfully create ho gaya! 🚀", "success");
-}*/
-  
 function processBulkData() {
     const inputField = document.getElementById('modal-input');
     if (!inputField) return;

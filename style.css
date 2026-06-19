@@ -1267,8 +1267,9 @@ input:checked + .toggle-slider:before {
     padding: 0 16px !important;
     
     /* PERFORMANCE ISOLATION FOR MOBILE ENGINE */
-    -webkit-backface-visibility: hidden !important;
-    backface-visibility: hidden !important;
+contain: layout style paints; /* Browser rendering calculations scope boundary lock */
+    backface-visibility: hidden; /* cite: Source: style.css */
+    -webkit-backface-visibility: hidden; 
     -webkit-perspective: 1000px !important;
     perspective: 1000px !important; 
     -webkit-transform: translate3d(0, 0, 0) !important;
@@ -2031,87 +2032,82 @@ input:checked + .toggle-slider:before {
 }
 
 
+/* ==========================================================================
+   --- 📱 PREMIUM TRIPLE-IMAGE FLUID SLIDER presets (style.css) ---
+   ========================================================================== */
 .preview-zoom-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    
-    /* 🌟 CHANGE: Heavy dark solid block se hatakar sirf 30% alpha opacity di */
-    background-color: rgba(15, 23, 42, 0.3); 
-    
-    /* Safe glass blur layer tracking */
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    
-    display: none; 
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background-color: rgba(15, 23, 42, 0.4); /* Smooth dark shadow tint */
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    display: none;
     align-items: center;
     justify-content: center;
-    z-index: 9999999; 
+    z-index: 9999999;
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.25s ease;
 }
-
 
 .preview-zoom-overlay.active {
     display: flex;
     opacity: 1;
 }
 
-/* Close action circular float badge */
-.zoom-close-btn {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #ffffff;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    z-index: 10;
-    transition: transform 0.1s;
-}
-
-.zoom-close-btn:active {
-    transform: scale(0.85);
-}
-
-.zoom-close-btn svg {
-    width: 18px;
-    height: 18px;
-}
-
-/* Zoom Image Scroll viewport wrapper frame */
+/* Scroll wrapper container layer */
 .zoom-viewport-container {
-    width: 100%;
-    height: 100%;
-    overflow: auto; /* Multi-directional touch scrolling mapping */
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden; /* Excess left/right images chupi rahengi */
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
     box-sizing: border-box;
 }
 
-
-.zoom-viewport-container img {
-    max-width: 95%;
-    max-height: 90%;
-    object-fit: contain;
-    border-radius: 8px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    cursor: default; 
-    user-select: none;
-    pointer-events: none; 
+/* 🔥 THE INFINITE HARDWARE ACCELERATED TRACK MACHINE */
+.zoom-track-slider {
+    display: flex;
+    width: 300vw; /* Exact 3 screens width sideways */
+    height: 100%;
+    position: absolute;
+    left: -100vw; /* Default Center Image hamesha window ke bich me dikhegi */
+    align-items: center;
+    justify-content: center;
+    will-change: transform, opacity; /* cite: Source: style.css */
+    transform: translate3d(0, 0, 0); /* cite: Source: style.css */
 }
 
+/* Unified images configuration bounds inside slider track */
+.zoom-track-slider img {
+    width: 100vw;
+    height: 90vh;
+    object-fit: contain;
+    padding: 0 24px; /* Soft cushioning between images while swiping */
+    box-sizing: border-box;
+    user-select: none;
+    pointer-events: none; /* Stops native dragging overrides browser conflict */
+    -webkit-user-drag: none;
+}
+
+.zoom-close-btn {
+    position: absolute;
+    top: 24px; right: 24px;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 99999999;
+    transition: transform 0.1s ease;
+}
+.zoom-close-btn:active { transform: scale(0.9); }
+.zoom-close-btn svg { width: 20px; height: 20px; }
 
 .menu-backdrop-shield {
     position: fixed !important;
