@@ -1,328 +1,926 @@
-/* WayStock Master - Admin Portal Engine */
-
-// Verify Admin Session
-function checkAdminAccess() {
-  if (!isAdminAuthenticated()) {
-    alert("Admin session expired or unauthorized. Redirecting...");
-    window.location.href = 'index.html';
-  }
-}
-
-// 1. Bulk Data Tree Importer (processBulkData)
-function processBulkData() {
-  const textarea = document.getElementById('bulk-import-textarea');
-  if (!textarea) return;
-
-  const text = textarea.value.trim();
-  if (!text) {
-    showToast("Please paste or enter inventory data");
-    return;
-  }
-
-  const lines = text.split('\n');
-  let addedCount = 0;
-
-  lines.forEach(line => {
-    const trimmed = line.trim();
-    if (!trimmed) return;
-
-    // Syntax: Root > Category > Item Name | Quantity | Unit
-    const parts = trimmed.split('>').map(p => p.trim());
-    if (parts.length >= 3) {
-      const root = parts[0];
-      const category = parts[1];
-      const itemRaw = parts[2];
-
-      // Parse item name, quantity, unit
-      let name = itemRaw;
-      let qty = 10;
-      let unit = "Piece";
-
-      if (itemRaw.includes('|')) {
-        const itemParts = itemRaw.split('|').map(ip => ip.trim());
-        name = itemParts[0];
-        if (itemParts[1]) qty = parseInt(itemParts[1]) || 10;
-        if (itemParts[2]) unit = itemParts[2];
-      }
-
-      // Add to runtime structure
-      if (!window.wayStock_runtime_inventory.rootStructures.includes(root)) {
-        window.wayStock_runtime_inventory.rootStructures.push(root);
-      }
-
-      if (!window.wayStock_runtime_inventory.categories[root]) {
-        window.wayStock_runtime_inventory.categories[root] = [];
-      }
-      if (!window.wayStock_runtime_inventory.categories[root].includes(category)) {
-        window.wayStock_runtime_inventory.categories[root].push(category);
-      }
-
-      const key = `${root} > ${category}`;
-      if (!window.wayStock_runtime_inventory.items[key]) {
-        window.wayStock_runtime_inventory.items[key] = [];
-      }
-
-      // Avoid duplicates
-      const existing = window.wayStock_runtime_inventory.items[key].find(i => i.name.toLowerCase() === name.toLowerCase());
-      if (!existing) {
-        window.wayStock_runtime_inventory.items[key].push({
-          id: `item_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-          name: name,
-          qty: qty,
-          unit: unit,
-          allowedUnits: window.allowedUnits
-        });
-        addedCount++;
-      }
-    }
-  });
-
-  syncToFirebase();
-  textarea.value = '';
-  showToast(`Successfully imported ${addedCount} new items`);
-  renderAdminCategoryTree();
-}
-
-// Setup Smart Auto-Suggest Hint Chips for Bulk Import
-function setupBulkSmartHint() {
-  const textarea = document.getElementById('bulk-import-textarea');
-  const hintChip = document.getElementById('bulk-smart-hint');
-  
-  if (!textarea || !hintChip) return;
-
-  textarea.addEventListener('input', () => {
-    const text = textarea.value;
-    const lastLine = text.split('\n').pop() || '';
+(function secureAdminWorkspace() {
+    // 🔑 SECURITY UPGRADE: Shifting from LocalStorage to SessionStorage to prevent spoofing
+    const loginToken = sessionStorage.getItem('wayStock_admin_authenticated');
+    const tokenExpiry = sessionStorage.getItem('wayStock_admin_expiry');
+    const currentTime = Date.now();
     
-    if (lastLine.includes('>')) {
-      const parts = lastLine.split('>');
-      if (parts.length === 1) {
-        hintChip.innerText = "Hint: Type category name next (e.g. Hardware > Fasteners)";
-      } else if (parts.length === 2) {
-        hintChip.innerText = "Hint: Type item name | Qty | Unit (e.g. Hex Bolt | 100 | Piece)";
-      }
-    } else {
-      hintChip.innerText = "Syntax: Root > Category > Item Name | Qty | Unit";
+    // Fallback checks on LocalStorage just in case of light tab retention
+    const localBackupToken = localStorage.getItem('wayStock_admin_token');
+    const localBackupExpiry = localStorage.getItem('wayStock_admin_expiry');
+
+    let isAuthenticated = false;
+
+    if (loginToken === "true" && tokenExpiry && currentTime <= parseInt(tokenExpiry)) {
+        isAuthenticated = true;
+    } else if (localBackupToken === "true" && localBackupExpiry && currentTime <= parseInt(localBackupExpiry)) {
+        // Hydrate session if local storage token is still valid
+        sessionStorage.setItem('wayStock_admin_authenticated', "true");
+        sessionStorage.setItem('wayStock_admin_expiry', localBackupExpiry);
+        isAuthenticated = true;
     }
-  });
+    
+    if (!isAuthenticated) {
+        // Force complete wipe out of fake or expired tokens
+        sessionStorage.removeItem('wayStock_admin_authenticated');
+        sessionStorage.removeItem('wayStock_admin_expiry');
+        localStorage.removeItem('wayStock_admin_token');
+        localStorage.removeItem('wayStock_admin_expiry');
+        
+        alert("🚫 Access Denied: Unauthorized Session Detour Detected!");
+        window.location.href = "index.html"; 
+    }
+})();
+
+const menuBtn = document.getElementById('menu-btn');
+const adminMenu = document.getElementById('admin-menu');
+const backdropShield = document.getElementById('menu-backdrop-shield');
+
+if (menuBtn && adminMenu) {
+    menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        const isCurrentlyOpen = adminMenu.classList.contains('active');
+        
+        if (isCurrentlyOpen) {
+            window.history.back(); // Khula he toh system back trigger karo direct
+        } else {
+            adminMenu.classList.add('active');
+            if (backdropShield) backdropShield.classList.add('active');
+            
+            // SYSTEM BACK HISTORY LOCK
+            if (window.history.state?.overlay !== 'admin-dropdown-menu') {
+                history.pushState({ overlay: 'admin-dropdown-menu' }, "");
+            }
+        }
+    });
 }
 
-// 2. Global Unit Propagation (handleAdminUnitEnter)
-function handleAdminUnitEnter(event, categoryKey) {
-  if (event.key === 'Enter') {
-    const input = event.target;
-    const newUnit = input.value.trim();
-    if (!newUnit) return;
+// Global scope close function mapped seamlessly
+window.closeAdminMenuDropdownDirectly = function(isBackAction = false) {
+    const menuBox = document.getElementById('admin-menu');
+    const shieldLayer = document.getElementById('menu-backdrop-shield');
+    
+    // Shield aur Menu dono ko hide karo
+    if (menuBox) menuBox.classList.remove('active');
+    if (shieldLayer) shieldLayer.classList.remove('active');
 
-    if (!window.allowedUnits.includes(newUnit)) {
-      window.allowedUnits.push(newUnit);
+    // Agar user ne manually click kiya he (isBackAction = false), 
+    // toh history se state pop karo taaki back button sync ho jaye
+    if (!isBackAction && window.history.state?.overlay === 'admin-dropdown-menu') {
+        window.history.back();
+    }
+};
+
+
+document.addEventListener('click', function(e) {
+    const activeMenu = document.getElementById('admin-menu');
+    const activeBtn = document.getElementById('menu-btn');
+    
+    if (activeMenu && activeMenu.classList.contains('active')) {
+
+        if (!activeBtn.contains(e.target) && !activeMenu.contains(e.target)) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("🎯 [Interceptor] Menu ke bahar click hua. Closing dropdown safely.");
+            closeAdminMenuDropdownDirectly(); // Safely pops state history back
+        }
+    }
+}, true); // True hierarchy filters capture layer preserved
+
+window.closeAdminMenuDropdownDirectly = function(isBackAction = false) {
+    const menuBox = document.getElementById('admin-menu');
+    const shieldLayer = document.getElementById('menu-backdrop-shield');
+    
+    if (menuBox) menuBox.classList.remove('active');
+    if (shieldLayer) shieldLayer.classList.remove('active');
+
+    if (!isBackAction && window.history.state?.overlay === 'admin-dropdown-menu') {
+        window.history.back();
+    }
+};
+
+let targetParentForNewItem = 'root'; 
+
+// --- ADMIN-SCRIPT.JS (OPENACTIONMODAL) ---
+function openActionModal(type, parentKey) {
+    const modal = document.getElementById('action-modal');
+    const title = document.getElementById('modal-title');
+    const adminMenu = document.getElementById('admin-menu');
+    
+    targetParentForNewItem = parentKey || window.currentFolder || 'root';
+    const displayFolderName = targetParentForNewItem === 'root' ? 'Home' : targetParentForNewItem.split('>').pop().trim();
+    title.innerText = `Add inside: ${displayFolderName}`;
+    
+// admin-script.js ke openActionModal ke aakhiri lines ko isse replace karein:
+    if (adminMenu && adminMenu.classList.contains('active')) { //
+        adminMenu.classList.remove('active'); //
     }
 
-    // Propagate unit across all items in category tree
-    for (let key in window.wayStock_runtime_inventory.items) {
-      if (key.startsWith(categoryKey) || categoryKey === 'ALL') {
-        window.wayStock_runtime_inventory.items[key].forEach(item => {
-          if (!item.allowedUnits) item.allowedUnits = [...window.allowedUnits];
-          if (!item.allowedUnits.includes(newUnit)) {
-            item.allowedUnits.push(newUnit);
-          }
-        });
-      }
+    // STRICT FRAMEWORK INTEGRATION: Manual entry hatakar global framework overlay handler ko trigger karo
+    if (typeof openOverlay === 'function') {
+        openOverlay('action-modal');
     }
 
-    syncToFirebase();
-    input.value = '';
-    showToast(`Unit "${newUnit}" propagated globally`);
-    renderAdminCategoryTree();
-  }
-}
 
-// 3. Global Broadcast Notifications
-function sendGlobalBroadcast() {
-  const input = document.getElementById('broadcast-message-input');
-  if (!input) return;
-
-  const rawMessage = input.value.trim();
-  if (!rawMessage) {
-    showToast("Please enter a broadcast message");
-    return;
-  }
-
-  // Replace @user tag with current user/client name
-  const clientName = localStorage.getItem('waystock_user_name') || 'Valued Team Member';
-  const parsedMessage = rawMessage.replace(/@user/g, clientName);
-
-  // Play audio chime notification
-  playAudioNotificationChime();
-
-  showToast(`Broadcast Sent: "${parsedMessage}"`);
-  input.value = '';
-}
-
-function playAudioNotificationChime() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5 note
-    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.2); // A5 note
-
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
-  } catch (e) {
-    console.warn("Audio chime unsupported", e);
-  }
-}
-
-// 4. QR App Invitation Card Generator (triggerAdminAppLinkSharing)
-function triggerAdminAppLinkSharing() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 500;
-  canvas.height = 650;
-  const ctx = canvas.getContext('2d');
-
-  // Background
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(0, 0, 500, 650);
-
-  // Decorative Accents
-  ctx.fillStyle = '#10b981';
-  ctx.fillRect(0, 0, 500, 12);
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 26px sans-serif';
-  ctx.fillText('WAYSTOCK MASTER', 40, 60);
-
-  ctx.fillStyle = '#34d399';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.fillText('MOBILE DIGITAL INVENTORY PWA', 40, 88);
-
-  // QR Code Placeholder Box
-  ctx.fillStyle = '#1e293b';
-  ctx.fillRect(100, 140, 300, 300);
-  ctx.strokeStyle = '#10b981';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(100, 140, 300, 300);
-
-  // Simulated QR Patterns
-  ctx.fillStyle = '#10b981';
-  ctx.fillRect(130, 170, 70, 70);
-  ctx.fillRect(300, 170, 70, 70);
-  ctx.fillRect(130, 340, 70, 70);
-  
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(145, 185, 40, 40);
-  ctx.fillRect(315, 185, 40, 40);
-  ctx.fillRect(145, 355, 40, 40);
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 18px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('Scan to Install PWA', 250, 480);
-
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '14px sans-serif';
-  ctx.fillText('100% Offline Support & Live Cloud Sync', 250, 510);
-  ctx.fillText(window.location.origin + window.location.pathname.replace('admin.html', 'index.html'), 250, 540);
-
-  const dataUrl = canvas.toDataURL('image/png');
-
-  // Display QR Modal
-  let modal = document.getElementById('qr-modal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'qr-modal';
-    modal.className = 'modal-overlay active';
-    modal.innerHTML = `
-      <div class="modal-sheet" style="max-width:440px; align-self:center; border-radius:24px; padding:20px; text-align:center;">
-        <h3 style="font-size:1.1rem; font-weight:700; color:#fff; margin-bottom:12px;">App Invitation Card</h3>
-        <img id="qr-card-img" src="${dataUrl}" style="width:100%; border-radius:16px; margin-bottom:16px;" />
-        <button onclick="shareQRCardImage('${dataUrl}')" class="btn-primary">Share Invitation Card</button>
-        <button onclick="document.getElementById('qr-modal').classList.remove('active')" class="btn-secondary" style="margin-top:8px;">Close</button>
-      </div>
-    `;
-    document.body.appendChild(modal);
-  } else {
-    document.getElementById('qr-card-img').src = dataUrl;
+    // Modal active class trigger karo aur stack confirm karo
     modal.classList.add('active');
-  }
+    if (window.history.state?.overlay !== 'action-modal') {
+        history.pushState({ overlay: 'action-modal' }, "");
+    }
 }
 
-async function shareQRCardImage(dataUrl) {
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  const file = new File([blob], 'WayStock_Invite.png', { type: 'image/png' });
+const menuItems = document.querySelectorAll('.menu-item');
 
-  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: 'WayStock Master PWA',
-        text: 'Join WayStock Master Digital Inventory PWA!'
-      });
-    } catch (e) {}
-  } else {
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = 'WayStock_Invite.png';
-    a.click();
-  }
+// 1. Add New Item Button
+if (menuItems[0]) {
+    menuItems[0].onclick = function(e) {
+        e.stopPropagation();
+        // 🌟 STEP 1: Pehle history back aur shield saaf karo
+        if (typeof window.closeAdminMenuDropdownDirectly === 'function') {
+            window.closeAdminMenuDropdownDirectly(false); // isBackAction=false taaki history.back() chale
+        }
+        
+        // 🌟 STEP 2: 150ms ruk kar modal kholo jab history stack stable ho jaye
+        setTimeout(() => {
+            openActionModal('folder'); 
+        }, 150);
+    };
 }
 
-// Render Admin Inventory Tree View
-function renderAdminCategoryTree() {
-  const container = document.getElementById('admin-tree-container');
-  if (!container) return;
+// 2. Settings Button
+if (menuItems[1]) {
+    menuItems[1].onclick = function(e) {
+        e.stopPropagation();
+        // 🌟 STEP 1: Shield aur dropdown dissolve kardo (History pop ke sath)
+        if (typeof window.closeAdminMenuDropdownDirectly === 'function') {
+            window.closeAdminMenuDropdownDirectly(false); 
+        }
+        
+        // 🌟 STEP 2: Brief delay ke baad settings section kholo
+        setTimeout(() => {
+            if (typeof openOverlay === 'function') {
+                openOverlay('setting'); 
+            }
+        }, 150);
+    };
+}
 
-  let html = '';
-  const roots = window.wayStock_runtime_inventory.rootStructures || [];
+// 3. Share App Link Button (Updated Fix)
+if (menuItems[2]) {
+    menuItems[2].onclick = function(e) {
+        e.stopPropagation();
+        
+        // 🌟 STEP 1: Pehle history back aur shield saaf karo
+        if (typeof window.closeAdminMenuDropdownDirectly === 'function') {
+            // 'false' pass kijiye taaki window.history.back() trigger ho
+            window.closeAdminMenuDropdownDirectly(false); 
+        }
+        
+        // 🌟 STEP 2: Brief delay ke baad share logic trigger karo 
+        // taaki browser share menu aur history pop aapas me na takrayein
+        setTimeout(() => {
+            if (typeof triggerAdminAppLinkSharing === 'function') {
+                triggerAdminAppLinkSharing();
+            }
+        }, 150);
+    };
+}
 
-  roots.forEach(root => {
-    const cats = window.wayStock_runtime_inventory.categories[root] || [];
-    html += `
-      <div style="margin-bottom:12px; background:var(--bg-primary); border:1px solid var(--border-subtle); border-radius:12px; padding:12px;">
-        <div style="font-weight:700; color:var(--accent-emerald); font-size:0.95rem;">📁 ${root}</div>
-        <div style="padding-left:16px; margin-top:8px;">
-    `;
+window.addEventListener('DOMContentLoaded', async () => {
+    // 🔑 INITIAL CLOUD SYNC: Pehle Firebase se data load karo
+    if (typeof loadFirebaseData === "function") {
+        await loadFirebaseData();
+    }
+    
+    updateBreadcrumb(); // Phir breadcrumb setup karo
+    renderAdminInventory(); // Phir fresh cards dikhao
+    if (typeof updateCartBadgeCount === "function") updateCartBadgeCount();
+});
 
-    cats.forEach(cat => {
-      const key = `${root} > ${cat}`;
-      const items = window.wayStock_runtime_inventory.items[key] || [];
-      html += `
-        <div style="margin-bottom:8px;">
-          <div style="font-size:0.85rem; font-weight:600; color:var(--accent-cyan);">📂 ${cat} (${items.length} items)</div>
-          <div style="padding-left:16px; margin-top:4px;">
-      `;
+// Global memory container mapping for debounce synchronization
+window.WayStockFirebaseSyncDebounceTimer = null;
 
-      items.forEach(item => {
-        html += `
-          <div style="font-size:0.8rem; color:var(--text-muted); display:flex; justify-content:space-between; padding:2px 0;">
-            <span>📦 ${item.name}</span>
-            <span style="color:#fff;">${item.qty} ${item.unit}</span>
-          </div>
-        `;
-      });
+function handleToggleStatus(key, isActive) {
+    const inventory = getActiveInventory(); // cite: Source: admin-script.js
 
-      html += `</div></div>`;
+    if (inventory[key]) { // cite: Source: admin-script.js
+        inventory[key].toggleOn = isActive; // cite: Source: admin-script.js
+        localStorage.setItem('wayStock_inventory', JSON.stringify(inventory)); // cite: Source: admin-script.js
+
+        console.log(`Saved locally: ${key} is ${isActive ? 'ON' : 'OFF'}`);
+
+        // 🔥 DEBOUNCE ENGINE: Har network click blast ko block karo
+        if (window.WayStockFirebaseSyncDebounceTimer) {
+            clearTimeout(window.WayStockFirebaseSyncDebounceTimer);
+        }
+
+        // Sirf tabhi cloud sync chalega jab admin clicks rok kar 1.2 seconds tak hold karega
+        window.WayStockFirebaseSyncDebounceTimer = setTimeout(() => {
+            if (typeof syncToFirebase === "function") {
+                console.log("☁️ [Debounce Engine] Committing stable batch changes to Firebase Cloud...");
+                syncToFirebase(); // cite: Source: admin-script.js
+            }
+        }, 1200); 
+    } // cite: Source: admin-script.js
+}
+
+function capitalizeWords(str) {
+    return str.split(' ').map(word => {
+        return word.charAt(0).toUpperCase() + word.slice(1);
+    }).join(' ');
+}
+
+function processBulkData() {
+    const inputField = document.getElementById('modal-input');
+    if (!inputField) return;
+    
+    const rawData = inputField.value.trim();
+    if (!rawData) return;
+
+    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
+    let cart = typeof getCartItems === "function" ? getCartItems() : {};
+
+    // ----------------------------------------------------------------------
+    // 🔥 BRANCH A: IF EDIT MODE IS ACTIVE - TRANSFORM NAME WITHOUT DUPLICATES
+    // ----------------------------------------------------------------------
+    if (isEditModeActive && editTargetKey) {
+        if (inventory[editTargetKey]) {
+            const newName = capitalizeWords(rawData); 
+            const oldName = inventory[editTargetKey].name;
+
+            // Actual Node references update lock
+            inventory[editTargetKey].name = newName;
+            inventory[editTargetKey].displayName = newName;
+
+            // My Bucket Real-time synchronization
+            Object.keys(cart).forEach(cKey => {
+                if (cKey === editTargetKey || cKey.startsWith(editTargetKey + '>')) {
+                    if (cart[cKey].name === oldName) {
+                        cart[cKey].name = newName;
+                    }
+                }
+            });
+
+            // Local DB commit registers
+            localStorage.setItem('wayStock_inventory', JSON.stringify(inventory));
+            if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
+            if (typeof syncToFirebase === "function") syncToFirebase();
+            localStorage.setItem(cartKey, JSON.stringify(cart));
+            
+            showAlert("Naam successfully badal gaya aur Cart me bhi sync ho gaya! ✅", "success");
+        }
+
+        // Reset execution control vectors safely
+        isEditModeActive = false;
+        editTargetKey = "";
+        const actionBtn = document.getElementById('modal-action-btn');
+        if (actionBtn) actionBtn.innerText = "Create Structure 🚀";
+        
+        inputField.value = ""; 
+        closeAllOverlays(); 
+        if (typeof exitSelectionMode === 'function') exitSelectionMode(); 
+        return; 
+    }
+
+    // ----------------------------------------------------------------------
+    // 📊 BRANCH B: IF BULK MODE ACTIVE - RUN DEEP EXCEL SEGMENATION PARSING
+    // ----------------------------------------------------------------------
+    const lines = rawData.split(/\r?\n|\t/)
+                         .map(line => line.trim())
+                         .filter(line => line.length > 0);
+
+    if (lines.length === 0) {
+        showAlert("Data empty he! Excel se copy karke yahan paste karein. 📋", "error");
+        return;
+    }
+
+    lines.forEach(line => {
+        const levels = line.split('>').map(lvl => capitalizeWords(lvl.trim()));
+        let currentParent = targetParentForNewItem || window.currentFolder || 'root';
+
+        levels.forEach((name, index) => {
+            const isLast = (index === levels.length - 1);
+            const uniqueKey = currentParent === 'root' ? name : `${currentParent}>${name}`;
+
+            if (!inventory[uniqueKey]) {
+                inventory[uniqueKey] = {
+                    name: name,
+                    displayName: name,
+                    type: isLast ? 'item' : 'folder',
+                    parent: currentParent,
+                    toggleOn: false,
+                    children: []
+                };
+
+                if (inventory[currentParent] && !inventory[currentParent].children.includes(uniqueKey)) {
+                    if(inventory[currentParent].type !== 'folder') {
+                        inventory[currentParent].type = 'folder'; 
+                    }
+                    inventory[currentParent].children.push(uniqueKey);
+                }
+            }
+            currentParent = uniqueKey;
+        });
     });
 
-    html += `</div></div>`;
-  });
+    // Atomic storage commit protocols locks
+    if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
+    if (typeof syncToFirebase === "function") syncToFirebase();
+    
+    inputField.value = "";
+    closeAllOverlays();
+    if (typeof renderAdminInventory === "function") renderAdminInventory();
+    showAlert("Excel data successfully import ho gaya! 🚀", "success");
+}
+        
 
-  container.innerHTML = html;
+window.renderAdminInventory = function() {
+    const mainArea = document.querySelector('.main-content-area');
+    
+    // RAM storage cache layer integration
+    const inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+    if (!mainArea) return;
+
+    mainArea.innerHTML = "";
+    const itemsToDisplay = Object.keys(inventory).filter(key => inventory[key].parent === window.currentFolder);
+
+    if (itemsToDisplay.length === 0) {
+        mainArea.innerHTML = getEmptyStateHTML();
+        return;
+    }
+
+    itemsToDisplay.forEach(key => {
+        if (inventory[key] && inventory[key].children && inventory[key].children.length > 0) {
+            inventory[key].type = 'folder';
+        }
+
+        const html = getUniversalCardHTML(key, inventory[key], 'admin');
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        const card = temp.firstElementChild;
+
+        if (isFolderNavigating) {
+            card.classList.add('folder-morph-active');
+        }
+
+        if (window.WayStockAdminState.selectedCards && window.WayStockAdminState.selectedCards.includes(key)) {
+            card.classList.add('selected-card');
+        }
+
+        // 🔑 THE CRITICAL FIX: Purana setupSelectionEventsOnCard poori tarah hataya!
+        // Ab ye direct naye secure single-click selector system ko trigger karega.
+        if (typeof setupSelectionEventsOnCard === 'function') {
+            setupSelectionEventsOnCard(card, key);
+        }
+
+        mainArea.appendChild(card);
+    });
+};
+
+document.getElementById('modal-input')?.addEventListener('input', function(e) {
+    const inputField = e.target;
+    const hintBadge = document.getElementById('bulk-smart-hint'); //
+    // Upgraded clean reference:
+const inventory = getActiveInventory();
+
+    
+    if (!hintBadge) return;
+
+    // 1. Textarea se aakhiri active line aur typing word segment nikalna
+    const lines = inputField.value.split('\n'); //
+    const currentLine = lines[lines.length - 1] || ""; //
+
+    const partsByArrow = currentLine.split('>'); //
+    const lastArrowSegment = partsByArrow[partsByArrow.length - 1] || ""; //
+    
+    const partsByComma = lastArrowSegment.split(','); //
+    const currentWord = (partsByComma[partsByComma.length - 1] || "").trim().toLowerCase(); //
+
+    if (!currentWord || currentWord.length < 2) {
+        hintBadge.style.display = 'none';
+        hintBadge.innerHTML = "";
+        return;
+    }
+
+    // 2. MULTI-MATCH FILTER: Database se options search karna (Top 4 elements tak allowed)
+    const existingNames = Array.from(new Set(Object.keys(inventory).map(k => inventory[k].name))); //
+    const matches = existingNames.filter(name => 
+        name.toLowerCase().startsWith(currentWord) && name.toLowerCase() !== currentWord
+    ).slice(0, 4); // Ek sath 4 options grid safely show kar payega
+
+    // 3. Smart Layout Rendering
+    if (matches.length > 0) {
+        // Flex display container active karein
+        hintBadge.style.display = 'flex';
+        
+// INSIDE document.getElementById('modal-input')?.addEventListener('input'...) BLOCK:
+// Hint chips ko template literals me draw karte waqt brand colors apply kijiye:
+hintBadge.innerHTML = matches.map(match => `
+    <span class="individual-hint-chip" style="background: #e6f4f5; color: #1d6881; padding: 5px 11px; border-radius: 20px; font-weight: bold; font-size: 11px; border: 1px solid #bce2e4; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: inline-block;">
+        💡 ${match}
+    </span>
+`).join('');
+
+
+        // Listeners integration to handle auto-fill actions
+        const chips = hintBadge.querySelectorAll('.individual-hint-chip');
+        chips.forEach((chip, idx) => {
+            chip.onmouseenter = () => { chip.style.background = '#dbeafe'; };
+            chip.onmouseleave = () => { chip.style.background = '#eff6ff'; };
+
+            chip.onclick = function(event) {
+                event.stopPropagation();
+                const selectedText = matches[idx];
+
+                // Textarea auto-fill composition execution
+                partsByComma[partsByComma.length - 1] = " " + selectedText; //
+                partsByArrow[partsByArrow.length - 1] = partsByComma.join(', '); //
+                lines[lines.length - 1] = partsByArrow.join(' > '); //
+                
+                inputField.value = lines.join('\n'); //
+                hintBadge.style.display = 'none'; //
+                hintBadge.innerHTML = "";
+                inputField.focus(); //
+            };
+        });
+    } else {
+        hintBadge.style.display = 'none';
+        hintBadge.innerHTML = "";
+    }
+});
+
+// REPLACE WITH THIS ENCAPSULATED ADMIN STATE PATTERN:
+// Ek single global wrapper state object jo hamari data matrix ko protect rakhega
+window.WayStockAdminState = {
+    selectedCards: [],
+    isSelectionMode: false,
+    longPressTimer: null,
+    LONG_PRESS_DURATION: 600 // Consistency lock
+};
+
+function toggleCardSelection(key) {
+    const state = window.WayStockAdminState;
+    const index = state.selectedCards.indexOf(key);
+    let isCurrentlySelected = false;
+
+    if (index > -1) {
+        state.selectedCards.splice(index, 1);
+    } else {
+        state.selectedCards.push(key);
+        isCurrentlySelected = true;
+    }
+
+    const targetCardElement = document.querySelector(`.main-content-area .inventory-card[data-key="${key}"]`);
+    
+    if (targetCardElement) {
+        if (isCurrentlySelected) {
+            targetCardElement.classList.add('selected-card');
+        } else {
+            targetCardElement.classList.remove('selected-card');
+        }
+    }
+
+    if (state.selectedCards.length === 0) {
+        exitSelectionMode();
+    } else {
+        updateSelectionHeaderUI();
+    }
 }
 
-// On Page Load
-document.addEventListener('DOMContentLoaded', () => {
-  checkAdminAccess();
-  setupBulkSmartHint();
-  renderAdminCategoryTree();
-});
+function updateSelectionHeaderUI() {
+    const state = window.WayStockAdminState;
+    const toolbar = document.getElementById('selection-toolbar'); 
+    const counterText = document.getElementById('selection-counter-text'); 
+    const btnContainer = document.getElementById('selection-buttons-container'); 
+    
+    if (!toolbar || !counterText || !btnContainer) return;
+
+    if (!state.isSelectionMode || state.selectedCards.length === 0) {
+        exitSelectionMode();
+        return;
+    }
+
+    // 🌟 ROUTING FIX: Agar state stack lock nahi he toh push karo taaki system back capture ho sake
+    if (window.history.state?.overlay !== 'selection-mode') {
+        history.pushState({ overlay: 'selection-mode' }, ""); 
+    }
+
+    if (toolbar.style.display !== 'flex') {
+        toolbar.style.display = 'flex';
+        toolbar.classList.add('active-animation', 'first-load');
+        setTimeout(() => { toolbar.classList.remove('first-load'); }, 1000);
+    }
+
+    counterText.innerText = `${state.selectedCards.length} Selected`; 
+
+    const inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+    const itemsToDisplay = Object.keys(inventory).filter(key => inventory[key].parent === window.currentFolder); 
+    
+    const isAllSelected = state.selectedCards.length === itemsToDisplay.length; 
+    const isSingleSelected = state.selectedCards.length === 1; 
+
+    // 🌟 COLOR UPGRADE: Svg contours ko hardcoded blue se badalkar var(--primary) par mapping kiya
+    btnContainer.innerHTML = `
+        <button class="sel-btn" title="${isAllSelected ? 'Deselect All' : 'Select All'}" onclick="toggleSelectAllAction(${isAllSelected})">
+            ${isAllSelected 
+                ? `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" fill="var(--primary)" stroke="var(--primary)"/><polyline points="9 11 12 14 22 4" stroke="#ffffff" stroke-width="2.5"/></svg>`
+                : `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="var(--primary)"/></svg>`
+            }
+        </button>
+
+        <button class="sel-btn" title="Add Selection to Cart" onclick="triggerBulkCartAction()">
+            <svg viewBox="0 0 24 24" stroke="var(--primary)"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        </button>
+
+        ${isSingleSelected ? `
+        <button class="sel-btn" title="Edit Item Name" onclick="triggerSingleEditAction()">
+            <svg viewBox="0 0 24 24" stroke="var(--primary)"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"></path></svg>
+        </button>` : ''}
+
+        <button class="sel-btn" title="Delete Selected" onclick="triggerBulkDeleteAction()">
+            <svg viewBox="0 0 24 24" stroke="var(--danger)"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+        </button>
+    `; 
+}
+
+function exitSelectionMode(isBackAction = false) {
+    window.WayStockAdminState.isSelectionMode = false;
+    window.WayStockAdminState.selectedCards = [];
+    
+    isEditModeActive = false;
+    editTargetKey = "";
+    
+    const toolbar = document.getElementById('selection-toolbar'); 
+    if (toolbar) {
+        toolbar.classList.add('closing-fade');
+        toolbar.classList.remove('active-animation');
+        
+        setTimeout(() => {
+            toolbar.style.display = 'none';
+            toolbar.classList.remove('closing-fade'); 
+        }, 200);
+    }
+    
+    // 🌟 ROUTING SAFETY RESET: System pop engine hook balance setup
+    if (!isBackAction && window.history.state?.overlay === 'selection-mode') {
+        window.history.back();
+    } else {
+        renderAdminInventory(); 
+    }
+}
+
+let isEditModeActive = false; 
+let editTargetKey = "";       // Kis key ko edit kar rahe hain
+
+function triggerSingleEditAction() {
+    if (!window.WayStockAdminState.selectedCards || window.WayStockAdminState.selectedCards.length !== 1) return;
+    
+    const selectedKey = window.WayStockAdminState.selectedCards[0];
+    // Upgraded clean reference:
+const inventory = getActiveInventory();
+
+    if (!inventory[selectedKey]) return;
+
+    // 1. Edit State Activate karein
+    isEditModeActive = true;
+    editTargetKey = selectedKey;
+
+    // 2. Add New Item wale same standard modal elements ko pakdein
+    const modal = document.getElementById('action-modal'); //
+    const title = document.getElementById('modal-title');
+    const inputField = document.getElementById('modal-input');
+    const actionBtn = document.getElementById('modal-action-btn'); //
+
+    if (!modal || !inputField) return;
+
+    // 3. UI Content transform karke purana naam textarea me inject karo
+    title.innerText = `Edit Name: ${inventory[selectedKey].name}`;
+    inputField.value = inventory[selectedKey].name;
+    if (actionBtn) actionBtn.innerText = "Save Changes ✏️";
+
+    // 4. Global centralized overlay kholo (common.js framework)
+    if (typeof openOverlay === 'function') {
+        openOverlay('action-modal');
+    }
+}
+
+
+function toggleSelectAllAction(shouldDeselectAll) {
+    const inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+    const itemsToDisplay = Object.keys(inventory).filter(key => inventory[key].parent === window.currentFolder);
+
+    if (shouldDeselectAll) {
+        window.WayStockAdminState.selectedCards = [];
+    } else {
+        window.WayStockAdminState.selectedCards = [...itemsToDisplay];
+    }
+    
+    // Select All / Deselect All par header stable rahega, icons refresh animation trigger nahi marenge
+    const toolbar = document.getElementById('selection-toolbar');
+    if (toolbar) toolbar.classList.remove('first-load');
+
+    updateSelectionHeaderUI();
+    renderAdminInventory();
+}
+
+function setupSelectionEventsOnCard(card, key) {
+    if (!card) return;
+
+    const HOLD_THRESHOLD = 750; // Symmetrical hold limit
+    let startX = 0, startY = 0;
+    const SCROLL_TOLERANCE = 8; 
+
+    const startPress = (e) => {
+        if (e.target.closest('.card-add-btn') || e.target.closest('.fun-toggle') || e.target.closest('input') || e.target.closest('button') || e.target.closest('.card-qty-controller')) {
+            return;
+        }
+
+        if (e.type === 'touchstart' && e.touches.length > 0) {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        } else {
+            startX = e.clientX;
+            startY = e.clientY;
+        }
+        
+        if (window.WayStockAdminState.longPressTimer) clearTimeout(window.WayStockAdminState.longPressTimer);
+        
+        window.WayStockAdminState.longPressTimer = setTimeout(() => {
+            if (!window.WayStockAdminState.isSelectionMode) {
+                window.WayStockAdminState.isSelectionMode = true;
+                if (navigator.vibrate) navigator.vibrate(50); // Sharp haptic pop
+                toggleCardSelection(key);
+            }
+        }, HOLD_THRESHOLD);
+    };
+
+    const movePress = (e) => {
+        if (!window.WayStockAdminState.longPressTimer) return;
+        let currentX = 0, currentY = 0;
+        if (e.type === 'touchmove' && e.touches.length > 0) {
+            currentX = e.touches[0].clientX;
+            currentY = e.touches[0].clientY;
+        } else {
+            currentX = e.clientX;
+            currentY = e.clientY;
+        }
+        const diffX = Math.abs(currentX - startX);
+        const diffY = Math.abs(currentY - startY);
+
+        if (diffY > SCROLL_TOLERANCE || diffX > SCROLL_TOLERANCE) {
+            clearTimeout(window.WayStockAdminState.longPressTimer);
+            window.WayStockAdminState.longPressTimer = null;
+        }
+    };
+
+    const endPress = () => {
+        if (window.WayStockAdminState.longPressTimer) clearTimeout(window.WayStockAdminState.longPressTimer);
+    };
+
+    // Attach native touch events for scrolling balance
+    card.addEventListener('mousedown', startPress);
+    card.addEventListener('touchstart', startPress, { passive: true });
+    card.addEventListener('mousemove', movePress);
+    card.addEventListener('touchmove', movePress, { passive: true });
+    card.addEventListener('mouseup', endPress);
+    card.addEventListener('mouseleave', endPress);
+    card.addEventListener('touchend', endPress);
+    card.addEventListener('touchcancel', endPress);
+
+    // 🔑 CLICK INTERCEPTOR RESTORED TO STANDARD FLAT STATE
+    card.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (e.target.closest('.card-add-btn') || e.target.closest('.fun-toggle') || e.target.closest('input') || e.target.closest('button') || e.target.closest('.card-qty-controller')) {
+            return;
+        }
+
+        const freshInventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+        const isFolder = freshInventory[key] && (freshInventory[key].type === 'folder' || (freshInventory[key].children && freshInventory[key].children.length > 0));
+
+        if (window.WayStockAdminState.isSelectionMode === true) {
+            toggleCardSelection(key);
+        } else {
+            if (isFolder && typeof handleFolderClick === 'function') {
+                handleFolderClick(key);
+            }
+        }
+    };
+
+}
+
+function triggerBulkDeleteAction() {
+    if (window.WayStockAdminState.selectedCards.length === 0) return;
+
+    if (confirm(`Kya aap in ${window.WayStockAdminState.selectedCards.length} selected items aur unke saare sub-folders ko permanently delete karna chahte hain?`)) {
+        let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+        const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
+        let cart = typeof getCartItems === "function" ? getCartItems() : {};
+        
+        window.WayStockAdminState.selectedCards.forEach(selectedKey => {
+            // SAFETY FILTER: Agar key khali he toh skip karo, poora data nahi udna chahiye
+            if (!selectedKey || selectedKey === 'root') return;
+
+            // --- 🔴 STEP 1: PARENT TREE CLEANUP ---
+            const parentKey = inventory[selectedKey]?.parent; 
+            if (parentKey && inventory[parentKey] && inventory[parentKey].children) { 
+                inventory[parentKey].children = inventory[parentKey].children.filter(c => c !== selectedKey); 
+            }
+
+            // --- 🔴 STEP 2: STRICT SAFE RECURSIVE DELETION ---
+            Object.keys(inventory).forEach(invKey => {
+                // Exact key match ho ya strict parent-child separator '>' ke sath shuru ho
+                if (invKey === selectedKey || invKey.startsWith(selectedKey + '>')) {
+                    delete inventory[invKey]; 
+                }
+            });
+
+            // --- 🔴 STEP 3: CART BUCKET CLEANUP ---
+            Object.keys(cart).forEach(cartKeyElement => {
+                if (cartKeyElement === selectedKey || cartKeyElement.startsWith(selectedKey + '>')) {
+                    delete cart[cartKeyElement]; 
+                }
+            });
+        });
+
+        // Atomic commit locks safely to IndexedDB and Firebase Cloud
+        if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+        
+        if (typeof syncToFirebase === "function") {
+            syncToFirebase(); 
+        }
+        
+        showAlert("Selected items successfully delete ho gaye! 🔥", "success");
+        if (typeof window.renderAdminInventory === "function") window.renderAdminInventory();
+        exitSelectionMode(true); 
+    }
+}
+
+function triggerBulkCartAction() {
+    let cart = typeof getCartItems === "function" ? getCartItems() : {};
+    const inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
+    
+    // 🔑 MULTI-USER FIX: Dynamic key generator ko call kiya
+    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
+    let count = 0;
+
+    window.WayStockAdminState.selectedCards.forEach(key => {
+        // Items ko folder ke andar check karke filter lagaya
+        if (!cart[key] && inventory[key] && inventory[key].type === 'item') {
+            const rootFolder = key.includes('>') ? key.split('>')[0].trim() : 'Home';
+            cart[key] = {
+                name: inventory[key].name,
+                fullPath: key,
+                rootFolder: rootFolder,
+                quantity: 1,
+                unit: "Box"
+            };
+            count++;
+        }
+    });
+
+    if (count > 0) {
+        // 🔑 FIXED: Ab static key ki jagah naye logged-in user ki specific cart storage me data commit hoga
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+        showAlert(`✅ ${count} Items bucket me bulk add ho gaye!`, "success");
+    } else {
+        showAlert("Koi naya item (product) select nahi kiya gaya thaa ya sab pehle se added hain!", "error");
+    }
+    
+    if (typeof updateCartBadgeCount === "function") updateCartBadgeCount();
+    exitSelectionMode(true);
+}
+
+async function sendGlobalBroadcastNotification() {
+    const inputField = document.getElementById('admin-broadcast-input');
+    if (!inputField) return;
+    
+    const message = inputField.value.trim();
+    if (!message) {
+        showAlert("Oho! Pehle kuch message toh likhiye. ✍️", "error");
+        return;
+    }
+
+    try {
+        // Firebase Firestore me direct messaging hub target lock kiya
+        await firebase.firestore().collection("appSettings").doc("globalNotification").set({
+            text: message,
+            timestamp: Date.now()
+        });
+
+        showAlert("Notification sabhi users ko bhej di gayi! 📢", "success");
+        inputField.value = ""; // Clean input box
+        closeAllOverlays(); // Close overlay panel
+    } catch (e) {
+        console.error("Broadcast push failed:", e);
+        showAlert("Message send nahi ho paya, network check karein!", "error");
+    }
+}
+
+
+async function updateCloudAdminPassword() {
+    const oldPassInput = document.getElementById('admin-old-password');
+    const newPassInput = document.getElementById('admin-new-password');
+    
+    if (!oldPassInput || !newPassInput) return;
+    
+    const oldPassword = oldPassInput.value.trim();
+    const newPassword = newPassInput.value.trim();
+    
+    // Basic inputs verification
+    if (!oldPassword || !newPassword) {
+        showAlert("Oho! Dono fields (Old & New Password) bharna zaroori he. ✍️", "error");
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showAlert("⚠️ Naya password kam se kam 6 characters ka hona chahiye!", "error");
+        return;
+    }
+
+    try {
+        showAlert("Verifying old password with Firebase Cloud... ⏳", "info");
+        
+        // 1. Firebase se current password fetch karo
+        const adminAuthRef = firebase.firestore().collection("appSettings").doc("adminAuth");
+        const docSnap = await adminAuthRef.get();
+        
+        if (docSnap.exists) {
+            const currentCloudPassword = docSnap.data().password;
+            
+            // 2. Verify karo ki purana password match hota he ya nahi
+            if (oldPassword === String(currentCloudPassword)) {
+                
+                showAlert("Old password verified! Updating cloud registry... ☁️", "info");
+                
+                // 3. Naya password Firebase database me overwrite (set) karo
+                await adminAuthRef.set({
+                    password: newPassword
+                });
+                
+                showAlert("🎉 Master Password updated successfully on Cloud!", "success");
+                
+                // Inputs ko saaf karo
+                oldPassInput.value = "";
+                newPassInput.value = "";
+                
+// ⚡ SECURITY SAFETY ENHANCED: Clear all local and session tokens instantly on password reset
+setTimeout(() => {
+    sessionStorage.removeItem('wayStock_admin_authenticated');
+    sessionStorage.removeItem('wayStock_admin_expiry');
+    localStorage.removeItem('wayStock_admin_token');
+    localStorage.removeItem('wayStock_admin_expiry');
+    window.location.href = "index.html";
+}, 1500);
+                
+            } else {
+                showAlert("🚫 Purana (Old) Password galat he! Authentication Failed.", "error");
+            }
+        } else {
+            showAlert("Error: Cloud configuration not found!", "error");
+        }
+    } catch (error) {
+        console.error("Password update transaction crashed:", error);
+        showAlert("Network error! Password update failed.", "error");
+    }
+}
+
+function logoutAdminSession() {
+    if (confirm("Kya aap sach me Admin Panel se Logout karna chahte hain? 🚪")) {
+        // Clear everything everywhere to kill the session hooks safely
+        sessionStorage.removeItem('wayStock_admin_authenticated');
+        sessionStorage.removeItem('wayStock_admin_expiry');
+        localStorage.removeItem('wayStock_admin_token');
+        localStorage.removeItem('wayStock_admin_expiry');
+        
+        if (typeof showAlert === "function") {
+            showAlert("Session terminated safely. Logged out! 🔒", "info");
+        }
+        
+        setTimeout(() => {
+            window.location.href = "index.html"; 
+        }, 800);
+    }
+}
+
+function toggleSettingsStep(drawerId, headerElement) {
+    const parentWrapper = headerElement.closest('.accordion-step-wrapper');
+    if (!parentWrapper) return;
+    
+    const isOpenCurrently = parentWrapper.classList.contains('step-open');
+    
+    // Safety Reset: Baaki ke sabhi accordion drawers ko band karo pehle (Clutter-free environment)
+    document.querySelectorAll('.accordion-step-wrapper').forEach(wrapper => {
+        wrapper.classList.remove('step-open');
+    });
+    
+    // Agar pehle se khula nahi tha, toh is wale ko open karo smoothly
+    if (!isOpenCurrently) {
+        parentWrapper.classList.add('step-open');
+    }
+}
+
