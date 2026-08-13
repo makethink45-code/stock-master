@@ -1,156 +1,122 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#f0f4f8">
-
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <title>User Page</title>
-    <link rel="stylesheet" href="style.css">
-
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a">
+  <title>WayStock Master - Digital Inventory</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="user-onboarding-modal" class="modal-overlay user-login-active">
-    <div class="bulk-modal onboarding-card" style="text-align: center;">
-<div class="avatar-view" id="avatar-emoji">👋</div>
-        <h2 class="welcome-title">Welcome to WayStock</h2>
-        <p class="welcome-subtitle">Apna naam daal kar apni personal bucket chalu karein!</p>
-        
-        <div class="modal-body" style="padding-top: 12px;">
-            <input type="text" id="user-name-input" placeholder="Enter your name..." autocomplete="off" spellcheck="false" maxlength="20">
-            
-            <div class="modal-actions" style="margin-top: 16px;">
-<button id="user-submit-btn" class="add-inventory-fun-btn" style="width: 100%; margin: 0;" onclick="submitNewUserProfile()">Let's Go 🚀</button>
-            </div>
+
+  <!-- Header Section -->
+  <header class="app-header">
+    <div class="brand-row">
+      <div class="brand-title">
+        <span>📦</span> WayStock Master
+        <span class="brand-badge">PWA v2.4</span>
+      </div>
+    </div>
+
+    <!-- Search Box with Voice Assistant Button -->
+    <div class="search-box-container">
+      <div class="search-input-wrapper">
+        <span class="search-icon-left">🔍</span>
+        <input type="text" id="search-input" class="search-input" placeholder="Search inventory or type 'admin.html'..." autocomplete="off">
+      </div>
+      <button id="voice-search-btn" class="voice-btn" title="Voice Search Assistant">🎙️</button>
+
+      <!-- Search Suggestions Dropdown -->
+      <div id="search-suggestions" class="search-suggestion-chips"></div>
+    </div>
+  </header>
+
+  <!-- Interactive Breadcrumb Navigation Trail -->
+  <nav id="breadcrumb-section" class="breadcrumb-section"></nav>
+
+  <!-- Selection Toolbar (Appears during Long-Press Selection Mode) -->
+  <div id="selection-toolbar" class="selection-toolbar">
+    <span id="selected-count">0 Selected</span>
+    <div class="toolbar-actions">
+      <button onclick="selectAllVisibleItems()" class="toolbar-btn">Select All</button>
+      <button onclick="addSelectedToCart()" class="toolbar-btn" style="background:var(--accent-emerald);">+ Add to Cart</button>
+      <button onclick="cancelSelectionMode()" class="toolbar-btn" style="background:var(--accent-rose);">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Inventory Main List View Container -->
+  <main id="inventory-list" class="inventory-list"></main>
+
+  <!-- Floating Cart Toggle Bar -->
+  <div id="cart-floating-bar" class="cart-floating-bar" onclick="openCartModal()" style="display:none;">
+    <div class="cart-bar-left">
+      <span>🛒 Bucket</span>
+      <span id="cart-badge-count" class="cart-badge">0</span>
+    </div>
+    <div class="cart-bar-right">
+      <span>View Cart ›</span>
+    </div>
+  </div>
+
+  <!-- Cart / Bucket Modal Sheet -->
+  <div id="cart-modal" class="modal-overlay">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <span class="modal-title">🛒 My Order Bucket</span>
+        <button onclick="closeCartModal()" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="cart-items-list"></div>
+        <div style="margin-top:20px;">
+          <button onclick="generateCartPreview()" class="btn-primary">
+            <span>📄</span> Generate Canvas Order Slip
+          </button>
         </div>
+      </div>
     </div>
-</div>
+  </div>
 
-<div id="mic-overlay" class="recording-overlay">
-    <div class="voice-wave-container">
-        <div class="bar"></div>
-        <div class="bar"></div>
-        <div class="bar"></div>
-        <div class="bar"></div>
-        <div class="bar"></div>
-    </div>
-    <p class="listening-text">Listening...</p>
-</div>
-
-    <div class="app-container">
-<header class="main-header">
-    <div class="app-name">Way Stock</div>
-    
-    <div class="header-actions">
-        <button class="icon-btn" aria-label="Search" id="search-btn">
-            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        </button>
-
-        <button class="icon-btn" aria-label="Cart" id="cart-btn">
-            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
-        </button>
-    </div>
-</header>
-    
-    
-        <main class="content-body">
-    <div class="action-bar">
-        
-<div id="breadcrumb-section" class="breadcrumb-container">
-</div>
-<div id="search-section" class="search-container">
-    <div class="search-wrapper">
-<span class="search-icon">🔍</span>
-        <input type="text" id="main-search-input" placeholder="Search items..." autocomplete="off">
-        <button class="mic-btn" id="voice-search-btn">
-            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
-        </button>
-<div id="search-suggestion-chips" class="sober-search-dropdown"></div>
-    </div>
-</div>
-
-
-    </div>
-
-    <div class="main-content-area"></div>
-</main>
-
-</div>
-<div id="cart-section" class="full-page-section">
-    
-    <div class="cart-header">
-        <button class="icon-btn close-cart" onclick="window.history.back()">
-            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
-        <h3>My Bucket</h3>
-    </div>
-
-    <div id="cart-content-area" class="cart-body">
-        <div class="empty-state">
-<div class="empty-icon">🛒</div>
-
-<button class="fun-btn" onclick="window.history.back()">Maal Bharo! 🚀</button>
-
-<button class="checkout-btn" onclick="generateCartPreview()">Preview Order 🚀</button>
-
+  <!-- Interactive Triple-Image Zoom Viewer Modal -->
+  <div id="zoom-modal" class="modal-overlay">
+    <div class="modal-sheet" style="max-width:550px; align-self:center; border-radius:24px;">
+      <div class="modal-header">
+        <span class="modal-title">📄 Order Slip Preview</span>
+        <button onclick="closeZoomModal()" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Hardware Accelerated Zoom Track Slider -->
+        <div class="zoom-slider-container">
+          <div id="zoom-track-slider" class="zoom-track-slider"></div>
         </div>
-    </div>
 
-    <div class="cart-footer" style="display: none;">
-    <div class="total-info">
-        <span>Total Items: <b id="cart-count">0</b></span>
-    </div>
-    <button class="checkout-btn" onclick="generateCartPreview()">Preview Order 🚀</button>
-</div>
+        <div style="display:flex; justify-content:between; gap:10px; margin-top:16px;">
+          <button onclick="prevZoomSlide()" class="btn-secondary" style="flex:1;">‹ Prev</button>
+          <button onclick="nextZoomSlide()" class="btn-secondary" style="flex:1;">Next ›</button>
+        </div>
 
-</div>
-<div id="preview-section" class="full-page-section">
-    <div class="setting-header">
-        <button class="icon-btn" onclick="window.history.back()">
-            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
-        <h3>Order Images</h3>
+        <div style="margin-top:12px;">
+          <button onclick="shareOrDownloadSlip()" class="btn-primary">
+            <span>📤</span> Export & Flush Cart
+          </button>
+        </div>
+      </div>
     </div>
-    <div id="preview-content-area" class="cart-body" style="justify-content: flex-start; overflow-y: auto; padding: 16px 0;">
-        </div>
-</div>
-<div id="cloud-gateway-overlay" class="gateway-overlay">
-    <div class="gateway-card">
-        <div id="gateway-visuals" class="gateway-visuals ready">
-            <div class="keyhole-icon"></div>
-        </div>
-        <h3>Admin Cloud Access</h3>
-        <p>Enter Master Security PIN</p>
-        <div class="gateway-input-wrapper">
-            <input type="password" id="gateway-pin-input" placeholder="••••">
-            <div class="input-focus-effect"></div>
-        </div>
-        <button id="gateway-submit-btn">ACTIVATE PORTAL</button>
-        <div id="gateway-failure-hands" class="failure-hands"></div>
-    </div>
-</div>
-<div id="preview-zoom-overlay" class="preview-zoom-overlay">
-    <button class="zoom-close-btn" onclick="closeInteractiveZoomView()" aria-label="Close View">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-    </button>
-    
-    <div class="zoom-viewport-container" onclick="event.stopPropagation()">
-        <div id="zoom-track-slider" class="zoom-track-slider">
-            <img id="zoom-left-image" src="" alt="Previous Slip Component">
-            <img id="zoom-target-image" src="" alt="Active Center Target">
-            <img id="zoom-right-image" src="" alt="Next Slip Component">
-        </div>
-    </div>
-</div>
+  </div>
 
-<div id="custom-alert-container" class="alert-container"></div>
-
-<script src="common.js"></script>
-<script src="service-worker.js"></script>
-<script src="user-script.js"></script>
+  <!-- Scripts -->
+  <script src="common.js"></script>
+  <script src="user-script.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(err => {
+          console.log('ServiceWorker registration failed: ', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

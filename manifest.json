@@ -1,23 +1,18 @@
 {
+  "name": "WayStock Master",
   "short_name": "WayStock",
-  "name": "WayStock Master Inventory",
+  "description": "Offline-first cloud-synced mobile digital inventory web app.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
   "icons": [
     {
-      "src": "./logo.png",
-      "type": "image/png",
-      "sizes": "192x192"
-    },
-    {
-      "src": "./logo.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f172a'/><path d='M50,20 L25,32 V68 L50,80 L75,68 V32 Z' fill='%2310b981'/><path d='M50,30 L68,38 L50,46 L32,38 Z' fill='%236ee7b7'/></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
-  ],
-  "start_url": "./index.html",
-  "scope": "./",
-  "background_color": "#f8fafc",
-  "theme_color": "#1d6881",
-  "display": "standalone",
-  "orientation": "portrait"
+  ]
 }
-

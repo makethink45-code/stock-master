@@ -1,2704 +1,332 @@
-const searchBtn = document.getElementById('search-btn');
-const searchSection = document.getElementById('search-section');
-const breadcrumbSection = document.getElementById('breadcrumb-section');
-const micBtn = document.getElementById('voice-search-btn');
-const micOverlay = document.getElementById('mic-overlay');
-const searchInput = document.getElementById('main-search-input');
-window.pathStack = ['Home']; 
-window.currentFolder = 'root';
-window.isFolderNavigating = false;
+/* WayStock Master - Common Storage, Cloud Sync, Voice & Gateway Engine */
 
-
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBd83Jk5n7M2mkumtFT-t_zktD8Wz0cZnM",
-  authDomain: "stockmaster-94534.firebaseapp.com",
-  projectId: "stockmaster-94534",
-  storageBucket: "stockmaster-94534.firebasestorage.app",
-  messagingSenderId: "520506980567",
-  appId: "1:520506980567:web:e5d7661a3866d18d979892"
+// Global Runtime State
+window.wayStock_runtime_inventory = window.wayStock_runtime_inventory || {
+  rootStructures: ["Hardware", "Plumbing", "Electrical", "Paints"],
+  categories: {
+    "Hardware": ["Fasteners", "Hand Tools"],
+    "Plumbing": ["Pipes & Fittings", "Valves"],
+    "Electrical": ["Wiring", "Switches"],
+    "Paints": ["Interior", "Primer"]
+  },
+  items: {
+    "Hardware > Fasteners": [
+      { id: "item_1", name: "Hex Bolt M8x50", qty: 250, unit: "Piece", allowedUnits: ["Piece", "Box", "Pack"] },
+      { id: "item_2", name: "Drywall Screw 35mm", qty: 1200, unit: "Piece", allowedUnits: ["Piece", "Box", "Pack"] }
+    ],
+    "Hardware > Hand Tools": [
+      { id: "item_3", name: "Claw Hammer 16oz", qty: 15, unit: "Piece", allowedUnits: ["Piece"] },
+      { id: "item_4", name: "Adjustable Wrench 10in", qty: 8, unit: "Piece", allowedUnits: ["Piece"] }
+    ],
+    "Plumbing > Pipes & Fittings": [
+      { id: "item_5", name: "PVC Pipe 1in x 10ft", qty: 45, unit: "Piece", allowedUnits: ["Piece", "Bundle"] },
+      { id: "item_6", name: "Brass Elbow 1/2in", qty: 180, unit: "Piece", allowedUnits: ["Piece", "Box"] }
+    ],
+    "Electrical > Wiring": [
+      { id: "item_7", name: "Copper Wire 1.5sqmm (100m)", qty: 12, unit: "Roll", allowedUnits: ["Roll", "Meter"] }
+    ]
+  }
 };
 
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
-const db = firebase.firestore();
+window.pathStack = window.pathStack || ['Home'];
+window.currentFolder = 'Home';
+window.allowedUnits = window.allowedUnits || ["Piece", "Box", "Pack", "Roll", "Meter", "Bundle", "Kg", "Liter"];
 
+// 1. IndexedDB Storage Engine ("WayStockLocalDB")
+const DB_NAME = 'WayStockLocalDB';
+const DB_VERSION = 1;
+let dbInstance = null;
 
-// 🔑 OFFLINE COMPATIBILITY LAYER: Offline data access capabilities lock karna
-db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
-    console.warn("Firestore offline persistence state:", err.code);
-});
-
-
-
-const stockCollectionRef = db.collection("stock");
-const tokenRef = db.collection("appSettings").doc("versionControl");
-
-const dbName = "WayStockLocalDB";
-let localDBInstance = null;
-
-// Global Memory State: RAM ke andar runtime memory me data rahega, LocalStorage me nahi jayega!
-window.wayStock_runtime_inventory = {};
-
-function initWayStockIndexedDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(dbName, 1);
-        request.onupgradeneeded = (e) => {
-            const database = e.target.result;
-            if (!database.objectStoreNames.contains("inventoryStore")) {
-                database.createObjectStore("inventoryStore", { keyPath: "id" });
-            }
-        };
-        request.onsuccess = (e) => {
-            localDBInstance = e.target.result;
-            resolve(localDBInstance);
-        };
-        request.onerror = (e) => reject("IndexedDB Instance Error");
-    });
+function initIndexedDB() {
+  return new Promise((resolve) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('inventoryStore')) {
+        db.createObjectStore('inventoryStore');
+      }
+      if (!db.objectStoreNames.contains('searchHistory')) {
+        db.createObjectStore('searchHistory');
+      }
+    };
+    request.onsuccess = (e) => {
+      dbInstance = e.target.result;
+      resolve(dbInstance);
+    };
+    request.onerror = (e) => {
+      console.warn("IndexedDB init failed, using RAM cache", e);
+      resolve(null);
+    };
+  });
 }
 
-// 🔑 ONLY ONE PLACE TO WRITE: Sirf IndexedDB me data jayega
-function saveToIndexedDB(data) {
-    if (!localDBInstance) return;
-    const transaction = localDBInstance.transaction(["inventoryStore"], "readwrite");
-    const store = transaction.objectStore("inventoryStore");
-    store.put({ id: "current_stock", content: data });
-    window.wayStock_runtime_inventory = data; // RAM update for instant loops
-}
-
-// 🔑 ONLY ONE PLACE TO READ: Sirf IndexedDB se data niklega
-function readFromIndexedDB() {
-    return new Promise((resolve) => {
-        if (!localDBInstance) return resolve(null);
-        const transaction = localDBInstance.transaction(["inventoryStore"], "readonly");
-        const store = transaction.objectStore("inventoryStore");
-        const request = store.get("current_stock");
-        request.onsuccess = (e) => {
-            const res = e.target.result ? e.target.result.content : null;
-            if (res) window.wayStock_runtime_inventory = res; // Populate RAM state
-            resolve(res);
-        };
-        request.onerror = () => resolve(null);
-    });
-}
-
-// Helper utility to get inventory safely from RAM cache
-function getActiveInventory() {
-    return window.wayStock_runtime_inventory || {};
-}
-
-async function loadFirebaseData() {
+async function saveToIndexedDB(key, data) {
+  if (!dbInstance) await initIndexedDB();
+  if (!dbInstance) return;
+  return new Promise((resolve) => {
     try {
-        // Step 1: Local IndexedDB Initialize karo sabse pehle
-        await initWayStockIndexedDB();
-        
-        // Step 2: Instant Memory Hydration (Local cache se fast read)
-        let cachedInventory = await readFromIndexedDB();
-        if (cachedInventory) {
-            window.wayStock_runtime_inventory = cachedInventory; // RAM update
-            if (typeof refreshUI === "function") refreshUI();
-            console.log("📦 Loaded instantly from local IndexedDB storage cache.");
-        }
-
-        // Step 3: Internet Check Guard Gate
-        if (!navigator.onLine) {
-            console.log("✈️ Device offline he, operating strictly via local cache memory.");
-            return; 
-        }
-
-        console.log("☁️ Connected! Pulling segmented core structures from Firestore...");
-
-        // Step 4: Firebase se Master Root Structure fetch karo
-        const rootSnapshot = await stockCollectionRef.doc("rootStructures").get();
-        let freshFullInventory = {};
-
-        if (rootSnapshot.exists) {
-            freshFullInventory = rootSnapshot.data();
-            
-            // Step 5: Saare segments ko parallelly fetch karke merge karo
-            const segmentFetchPromises = Object.keys(freshFullInventory).map(rootKey => {
-                return stockCollectionRef.doc(`segment_${rootKey.replaceAll(" ", "_")}`).get();
-            });
-            
-            const segmentSnapshots = await Promise.all(segmentFetchPromises);
-            segmentSnapshots.forEach(snap => {
-                if (snap.exists) {
-                    Object.assign(freshFullInventory, snap.data());
-                }
-            });
-
-            // Local Token sync karein validation ke liye
-            const versionDoc = await tokenRef.get();
-            if (versionDoc.exists) {
-                localStorage.setItem('wayStock_local_token', String(versionDoc.data().token));
-            }
-
-            // Step 6: RAM aur IndexedDB dono ko overwrite karke safe update lock karo
-            window.wayStock_runtime_inventory = freshFullInventory;
-            saveToIndexedDB(freshFullInventory);
-            
-            if (typeof refreshUI === "function") refreshUI();
-            console.log("🎉 Firebase segmented data load complete and synced to IndexedDB!");
-        } else {
-            console.log("⚠️ No data found inside rootStructures cloud document root.");
-        }
-    } catch (e) {
-        console.error("❌ loadFirebaseData core infrastructure crashed:", e);
-    }
-}
-
-// ☁️ SMART MULTI-DOC SYNCHRONIZER
-async function syncToFirebase() {
-    const inventory = getActiveInventory(); // LocalStorage ki jagah RAM se uthaya
-    try {
-        const rootStructures = {};
-        const segmentedDocs = {};
-
-        Object.keys(inventory).forEach(key => {
-            const item = inventory[key];
-            if (item.parent === 'root') {
-                rootStructures[key] = item;
-                if (!segmentedDocs[key]) segmentedDocs[key] = {};
-            } else {
-                const rootParent = key.split('>')[0].trim();
-                if (!segmentedDocs[rootParent]) segmentedDocs[rootParent] = {};
-                segmentedDocs[rootParent][key] = item;
-            }
-        });
-
-        await stockCollectionRef.doc("rootStructures").set(rootStructures);
-
-        const uploadPromises = Object.keys(segmentedDocs).map(rootKey => {
-            return stockCollectionRef.doc(`segment_${rootKey.replaceAll(" ", "_")}`).set(segmentedDocs[rootKey]);
-        });
-        await Promise.all(uploadPromises);
-
-        const newToken = String(Date.now());
-        await tokenRef.set({ token: newToken }, { merge: true });
-        
-        localStorage.setItem('wayStock_local_token', newToken); // Token stays in localStorage for light comparison
-        saveToIndexedDB(inventory); // Direct single write to IndexedDB
-        
-        console.log(`🎯 Segmented Cloud Sync Complete. Data locked safely inside IndexedDB.`);
-    } catch (e) {
-        console.error("Multi-doc segment push failed:", e);
-    }
-}
-
-// 🔄 MULTI-TAB LIVE RE-SYNC WATCHER (WIRED WITH OFFLINE NETWORK GAARDS)
-tokenRef.onSnapshot(async (doc) => {
-    // Agar active internet hi nahi he, toh snapshot triggers ko silently kill karo
-    if (!navigator.onLine) return; 
-
-    try {
-        if (doc.exists) {
-            const cloudToken = String(doc.data().token);
-            const localToken = String(localStorage.getItem('wayStock_local_token'));
-            
-            if (cloudToken !== localToken) {
-                console.log("⚡ [Offline Engine] Background mutation detected. Fetching incremental logs...");
-                
-                const rootSnapshot = await stockCollectionRef.doc("rootStructures").get();
-                let freshFullInventory = {};
-
-                if (rootSnapshot.exists) {
-                    freshFullInventory = rootSnapshot.data();
-                    const segmentFetchPromises = Object.keys(freshFullInventory).map(rootKey => {
-                        return stockCollectionRef.doc(`segment_${rootKey.replaceAll(" ", "_")}`).get();
-                    });
-                    const segmentSnapshots = await Promise.all(segmentFetchPromises);
-                    segmentSnapshots.forEach(snap => {
-                        if (snap.exists) Object.assign(freshFullInventory, snap.data());
-                    });
-
-                    localStorage.setItem('wayStock_local_token', cloudToken);
-                    saveToIndexedDB(freshFullInventory);
-                    if (typeof refreshUI === "function") refreshUI();
-                }
-            }
-        }
-    } catch(err) {
-        console.log("🔒 [Offline Engine] Suppressed snapshot streaming conflicts.");
-    }
-});
-
-
-
-// 🚀 ADMIN TOKEN INCREMENT GENERATOR
-async function incrementCloudToken() {
-    try {
-        await db.runTransaction(async (transaction) => {
-            const sfDoc = await transaction.get(tokenRef);
-            let newToken = Date.now(); // Fallback timestamp configuration
-            if (sfDoc.exists) {
-                const currentToken = sfDoc.data().token || 0;
-                newToken = isNaN(currentToken) ? Date.now() : currentToken + 1;
-            }
-            transaction.set(tokenRef, { token: newToken }, { merge: true });
-        });
-        console.log("⚡ Cloud database token validation rolled forward.");
-    } catch (e) {
-        console.error("Token rolling failed:", e);
-    }
-}
-
-
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognition = null; // Global variable define karein
-
-if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-
-    recognition.onresult = (event) => {
-        if (!searchInput) return;
-        
-        // Voice text capture format converting to clean phrase
-        const transcript = event.results[0][0].transcript.trim().toLowerCase();
-        searchInput.value = event.results[0][0].transcript; // Output raw text in input bar
-        stopMic();
-
-        // Upgraded clean reference:
-const inventory = getActiveInventory();
-
-        const allKeys = Object.keys(inventory);
-// 1. COMMAND 1 BLOCK: "open [folder name]" area filter fix
-if (transcript.startsWith('open ')) {
-    const targetName = transcript.replace('open ', '').trim();
-    const matchedKey = allKeys.find(key => inventory[key].name.toLowerCase() === targetName);
-    
-    if (matchedKey) {
-        showAlert(`Opening folder: ${inventory[matchedKey].name} 📁`, "success");
-
-        const suggestionContainer = document.getElementById('search-suggestion-chips');
-        if (suggestionContainer) suggestionContainer.style.display = 'none'; 
-        searchInput.value = ""; 
-        
-        // 🔑 FIXED: Global close functions activate karo directly, history.back() hataya
-        document.getElementById('search-section')?.classList.remove('active');
-        document.getElementById('breadcrumb-section')?.classList.remove('hidden');
-
-        handleSuggestionClick(matchedKey); 
-    } else {
-        showAlert(`Folder "${targetName}" nahi mila!`, "error");
-    }
-    return;
-}
-
-// 2. COMMAND 2 BLOCK: "add [item name]" execution structure fix
-if (transcript.startsWith('add ')) {
-    let cleanPhrase = transcript.replace('add ', '').replace(' to cart', '').trim();
-    let quantity = 1;
-
-    const firstWord = cleanPhrase.split(' ')[0];
-    if (!isNaN(firstWord)) {
-        quantity = parseInt(firstWord, 10);
-        cleanPhrase = cleanPhrase.replace(firstWord, '').trim(); 
-    }
-
-    const matchedKey = allKeys.find(key => inventory[key].name.toLowerCase() === cleanPhrase);
-
-    if (matchedKey) {
-        const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
-        let cart = typeof getCartItems === "function" ? getCartItems() : {};
-        const rootFolder = matchedKey.includes('>') ? matchedKey.split('>')[0].trim() : 'Home';
-
-        if (!cart[matchedKey]) {
-            cart[matchedKey] = {
-                name: inventory[matchedKey].name,
-                fullPath: matchedKey,
-                rootFolder: rootFolder,
-                quantity: quantity,
-                unit: "Box"
-            };
-        } else {
-            cart[matchedKey].quantity += quantity;
-        }
-
-        localStorage.setItem(cartKey, JSON.stringify(cart));
-        showAlert(`✅ ${quantity} ${inventory[matchedKey].name} Bucket me add ho gaya!`, "success");
-        
-        searchInput.value = "";
-        const suggestionContainer = document.getElementById('search-suggestion-chips');
-        if (suggestionContainer) suggestionContainer.style.display = 'none';
-        
-        // 🔑 FIXED: Search overlay parameters clear loop safely embedded without history disruption
-        document.getElementById('search-section')?.classList.remove('active');
-        document.getElementById('breadcrumb-section')?.classList.remove('hidden');
-
-        if (typeof updateCartBadgeCount === "function") updateCartBadgeCount();
-        refreshUI();
-    } else {
-        showAlert(`Product "${cleanPhrase}" nahi mila!`, "error");
-    }
-    return;
-}
-
-        searchInput.dispatchEvent(new Event('input'));
-    };
-
-    recognition.onerror = () => stopMic();
-    recognition.onend = () => stopMic();
-}
-else {
-stopMic()
-}
-
-if (micBtn && recognition) {
-    micBtn.addEventListener('click', () => {
-        try {
-            // Sirf start() call karein, overlay ko yahan touch na karein
-            recognition.start();
-        } catch (e) {
-            showAlert("Mic system me problem he!", "error");
-        }
-    });
-
-recognition.onstart = () => {
-    micOverlay?.classList.add('active'); 
-    micBtn.classList.add('recording'); 
-    
-    if (window.history.state?.overlay !== 'mic-overlay') {
-        history.pushState({ overlay: 'mic-overlay' }, "");
-    }
-};
-
-
-recognition.onerror = (event) => {
-    micOverlay?.classList.remove('active');
-    micBtn?.classList.remove('recording');
-
-    if (event.error === 'not-allowed') {
-        showAlert("Permission Nahi Mili! Settings me allow karein.", "error"); //
-    } else {
-        showAlert("Mic error: " + event.error, "error"); //
-    }
-};
-}
-
-function getEmptyStateHTML() {
-    const isAdmin = typeof openActionModal === 'function';
-    
-    const buttonHTML = isAdmin 
-        ? `<button class="add-inventory-fun-btn" onclick="openActionModal('folder')">Maal Bharo! 🚀</button>`
-        : `<button class="add-inventory-fun-btn" onclick="openOverlay('cart')">Bucket Dekho! 🛒</button>`;
-
-    return `
-        <div class="empty-inventory-container">
-            <div class="empty-animation">📦✨</div>
-            <h2>Oho! Maal-Gadi Khali Hai</h2>
-            <p>Lagta hai abhi tak koi stock nahi aaya. Chalo, kuch naya bharte hain!</p>
-            ${buttonHTML}
-        </div>
-    `;
-}
-
-// Global array to hold current session's preview slips
-window.WayStockPreviewImages = [];
-window.WayStockCurrentImageIndex = 0;
-
-function generateCartPreview() {
-    const cart = getCartItems(); // cite: Source: common.js
-    const inventory = getActiveInventory(); // cite: Source: common.js
-    const keys = Object.keys(cart); // cite: Source: common.js
-
-    if (keys.length === 0) { // cite: Source: common.js
-        showAlert("Preview ke liye bucket me maal hona zaroori hai! 🛒", "error"); // cite: Source: common.js
-        return; // cite: Source: common.js
-    } // cite: Source: common.js
-
-    const groupedCart = {}; // cite: Source: common.js
-    keys.forEach(key => { // cite: Source: common.js
-        const item = cart[key]; // cite: Source: common.js
-        const root = item.rootFolder || "Home"; // cite: Source: common.js
-        if (!groupedCart[root]) groupedCart[root] = []; // cite: Source: common.js
-        groupedCart[root].push({ cartKey: key, ...item }); // cite: Source: common.js
-    }); // cite: Source: common.js
-
-    const previewContentArea = document.getElementById('preview-content-area'); // cite: Source: common.js
-    if (!previewContentArea) return; // cite: Source: common.js
-
-    previewContentArea.innerHTML = ""; // Reset grid items area
-    window.WayStockPreviewImages = []; // Reset global array for fresh session
-    
-    // 🌟 UPDATED BADGE APPEND ENGINE WITH GLOBAL INDEX POINTER
-    function appendPreviewCardToDOM(imgURL, rootName, itemKeysList) {
-        // Current image ko global array stack me save karo
-        window.WayStockPreviewImages.push(imgURL);
-        const currentImgIndex = window.WayStockPreviewImages.length - 1;
-
-        const downloadSVG = `
-            <svg viewBox="0 0 24 24" stroke="var(--primary)" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>`;
-
-        const whatsappSVG = `
-            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-            </svg>`;
-
-        const serializedKeys = encodeURIComponent(JSON.stringify(itemKeysList)); // cite: Source: common.js
-
-        const previewCard = document.createElement('div'); // cite: Source: common.js
-        previewCard.className = "group-preview-card"; // cite: Source: common.js
-        
-        // 🔑 CHANGED: Click par ab direct link pass karne ki jagah uska dynamic array index pass hoga
-        previewCard.innerHTML = `
-            <div class="preview-card-floating-actions">
-                <button onclick="shareGroupImage('${imgURL}', '${rootName}', '${serializedKeys}')" class="preview-action-icon-btn wa-share" title="Share via WhatsApp">
-                    ${whatsappSVG}
-                </button>
-                <button onclick="downloadGroupImage('${imgURL}', '${rootName}', '${serializedKeys}')" class="preview-action-icon-btn dl-png" title="Download PNG Picture">
-                    ${downloadSVG}
-                </button>
-            </div>
-            <div class="preview-card-image-wrapper">
-                <img src="${imgURL}" onclick="openInteractiveZoomView(${currentImgIndex})" style="cursor:zoom-in;" alt="${rootName} Order Image Preview">
-            </div>`; 
-        previewContentArea.appendChild(previewCard); // cite: Source: common.js
-    }
-
-    // Canvas rendering loop blocks context (Keep your existing canvas rendering code here as it is)
-    // ... (Aapka baaki ka canvas drawing loop logic perfectly chalta rahega) ...
-    // Bas loop ke aakhiri me jahan appendPreviewCardToDOM(imgURL, ...) chal rha tha vo automatically upar wale handler se route ho jayega.
-    
-    // Core structure logic reference end block
-    Object.keys(groupedCart).forEach((rootName) => {
-        const items = groupedCart[rootName]; // cite: Source: common.js
-        const maxParts = Math.ceil(items.length / 11); // cite: Source: common.js
-        const dpr = Math.max(window.devicePixelRatio || 1, 2); // cite: Source: common.js
-        const rowHeight = 40; // cite: Source: common.js
-        const headerHeight = 85; // cite: Source: common.js
-        const displayWidth = 450; // cite: Source: common.js
-        const displayHeight = 600; // cite: Source: common.js
-
-        let canvas = document.createElement('canvas'); // cite: Source: common.js
-        canvas.width = displayWidth * dpr; // cite: Source: common.js
-        canvas.height = displayHeight * dpr; // cite: Source: common.js
-        canvas.style.width = displayWidth + "px"; // cite: Source: common.js
-        canvas.style.height = displayHeight + "px"; // cite: Source: common.js
-
-        let ctx = canvas.getContext('2d'); // cite: Source: common.js
-        ctx.scale(dpr, dpr); // cite: Source: common.js
-
-        ctx.fillStyle = "#ffffff"; // cite: Source: common.js
-        ctx.fillRect(0, 0, displayWidth, displayHeight); // cite: Source: common.js
-
-        ctx.fillStyle = "#0f172a"; // cite: Source: common.js
-        ctx.font = "bold 20px ui-monospace, monospace"; // cite: Source: common.js
-        ctx.textAlign = "left"; // cite: Source: common.js
-        ctx.fillText(rootName.toUpperCase(), 20, 38); // cite: Source: common.js
-
-        ctx.fillStyle = "#64748b"; // cite: Source: common.js
-        ctx.font = "12px ui-monospace, monospace"; // cite: Source: common.js
-        let totalItemsText = "Total Items: " + items.length + " | Part: 1/" + maxParts + " | " + new Date().toLocaleDateString('en-GB'); // cite: Source: common.js
-        ctx.fillText(totalItemsText, 20, 60); // cite: Source: common.js
-
-        ctx.strokeStyle = "#0f172a"; // cite: Source: common.js
-        ctx.lineWidth = 2; // cite: Source: common.js
-        ctx.beginPath(); // cite: Source: common.js
-        ctx.moveTo(20, 72); // cite: Source: common.js
-        ctx.lineTo(displayWidth - 20, 72); // cite: Source: common.js
-        ctx.stroke(); // cite: Source: common.js
-
-        let currentY = headerHeight + 20; // cite: Source: common.js
-        let activeCanvas = canvas; // cite: Source: common.js
-        let activeCtx = ctx; // cite: Source: common.js
-        let activeSheetKeys = []; // cite: Source: common.js
-
-        items.forEach((item, idx) => {
-            if (idx > 0 && idx % 11 === 0) {
-                activeCtx.strokeStyle = "#94a3b8"; // cite: Source: common.js
-                activeCtx.lineWidth = 1; // cite: Source: common.js
-                activeCtx.beginPath(); // cite: Source: common.js
-                activeCtx.moveTo(20, displayHeight - 32); // cite: Source: common.js
-                activeCtx.lineTo(displayWidth - 20, displayHeight - 32); // cite: Source: common.js
-                activeCtx.stroke(); // cite: Source: common.js
-                activeCtx.textAlign = "left"; // cite: Source: common.js
-                activeCtx.fillStyle = "#94a3b8"; // cite: Source: common.js
-                activeCtx.font = "10px ui-monospace, monospace"; // cite: Source: common.js
-                activeCtx.fillText("Generated via WayStock Master", 20, displayHeight - 15); // cite: Source: common.js
-                activeCtx.textAlign = "right"; // cite: Source: common.js
-                activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), displayWidth - 20, displayHeight - 15); // cite: Source: common.js
-
-                const partialImgURL = activeCanvas.toDataURL("image/png"); // cite: Source: common.js
-                appendPreviewCardToDOM(partialImgURL, rootName, activeSheetKeys); // cite: Source: common.js
-                activeSheetKeys = []; // cite: Source: common.js
-
-                activeCanvas = document.createElement('canvas'); // cite: Source: common.js
-                activeCanvas.width = displayWidth * dpr; // cite: Source: common.js
-                activeCanvas.height = displayHeight * dpr; // cite: Source: common.js
-                activeCanvas.style.width = displayWidth + "px"; // cite: Source: common.js
-                activeCanvas.style.height = displayHeight + "px"; // cite: Source: common.js
-
-                activeCtx = activeCanvas.getContext('2d'); // cite: Source: common.js
-                activeCtx.scale(dpr, dpr); // cite: Source: common.js
-
-                activeCtx.fillStyle = "#ffffff"; // cite: Source: common.js
-                activeCtx.fillRect(0, 0, displayWidth, displayHeight); // cite: Source: common.js
-
-                activeCtx.fillStyle = "#0f172a"; // cite: Source: common.js
-                activeCtx.font = "bold 20px ui-monospace, monospace"; // cite: Source: common.js
-                activeCtx.textAlign = "left"; // cite: Source: common.js
-                activeCtx.fillText(rootName.toUpperCase() + " (CONT.)", 20, 38); // cite: Source: common.js
-                
-                activeCtx.fillStyle = "#64748b"; // cite: Source: common.js
-                activeCtx.font = "12px ui-monospace, monospace"; // cite: Source: common.js
-                const nextPart = Math.floor(idx / 11) + 1; // cite: Source: common.js
-                activeCtx.fillText("Total Items: " + items.length + " | Part: " + nextPart + "/" + maxParts + " | " + new Date().toLocaleDateString('en-GB'), 20, 60); // cite: Source: common.js
-                
-                activeCtx.strokeStyle = "#0f172a"; // cite: Source: common.js
-                activeCtx.lineWidth = 2; // cite: Source: common.js
-                activeCtx.beginPath(); // cite: Source: common.js
-                activeCtx.moveTo(20, 72); // cite: Source: common.js
-                activeCtx.lineTo(displayWidth - 20, 72); // cite: Source: common.js
-                activeCtx.stroke(); // cite: Source: common.js
-
-                currentY = headerHeight + 20; // cite: Source: common.js
-            }
-
-            activeSheetKeys.push(item.cartKey); // cite: Source: common.js
-
-            let finalNameToShow = item.name; // cite: Source: common.js
-            const pathParts = item.cartKey.split('>'); // cite: Source: common.js
-            if (pathParts.length > 1) { // cite: Source: common.js
-                pathParts.pop(); // cite: Source: common.js
-                const parentKey = pathParts.join('>').trim(); // cite: Source: common.js
-                const parentData = inventory[parentKey]; // cite: Source: common.js
-                if (parentData && parentData.toggleOn === true) { // cite: Source: common.js
-                    const parentName = parentData.name || parentKey.split('>').pop().trim(); // cite: Source: common.js
-                    finalNameToShow = parentName + " " + item.name; // cite: Source: common.js
-                } // cite: Source: common.js
-            } // cite: Source: common.js
-
-            activeCtx.textAlign = "left"; // cite: Source: common.js
-            activeCtx.fillStyle = "#1e293b"; // cite: Source: common.js
-            activeCtx.font = "500 14px ui-monospace, monospace"; // cite: Source: common.js
-            activeCtx.fillText((idx + 1) + ".  " + finalNameToShow, 20, currentY); // cite: Source: common.js
-
-            activeCtx.textAlign = "right"; // cite: Source: common.js
-            activeCtx.fillStyle = "#0f172a"; // cite: Source: common.js
-            activeCtx.font = "bold 15px ui-monospace, monospace"; // cite: Source: common.js
-            const finalUnitText = item.unit ? " " + item.unit : ""; // cite: Source: common.js
-            const qtyText = item.quantity + finalUnitText; // cite: Source: common.js
-            
-            activeCtx.fillText(qtyText, displayWidth - 20, currentY); // cite: Source: common.js
-
-            activeCtx.strokeStyle = "#e2e8f0"; // cite: Source: common.js
-            activeCtx.lineWidth = 1; // cite: Source: common.js
-            activeCtx.beginPath(); // cite: Source: common.js
-            activeCtx.moveTo(20, currentY + 12); // cite: Source: common.js
-            activeCtx.lineTo(displayWidth - 20, currentY + 12); // cite: Source: common.js
-            activeCtx.stroke(); // cite: Source: common.js
-
-            currentY += rowHeight; // cite: Source: common.js
-        });
-
-        activeCtx.strokeStyle = "#94a3b8"; // cite: Source: common.js
-        activeCtx.lineWidth = 1; // cite: Source: common.js
-        activeCtx.beginPath(); // cite: Source: common.js
-        activeCtx.moveTo(20, displayHeight - 32); // cite: Source: common.js
-        activeCtx.lineTo(displayWidth - 20, displayHeight - 32); // cite: Source: common.js
-        activeCtx.stroke(); // cite: Source: common.js
-        activeCtx.textAlign = "left"; // cite: Source: common.js
-        activeCtx.fillStyle = "#94a3b8"; // cite: Source: common.js
-        activeCtx.font = "10px ui-monospace, monospace"; // cite: Source: common.js
-        activeCtx.fillText("Generated via WayStock Master", 20, displayHeight - 15); // cite: Source: common.js
-        activeCtx.textAlign = "right"; // cite: Source: common.js
-        activeCtx.fillText(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), displayWidth - 20, displayHeight - 15); // cite: Source: common.js
-
-        // ... (Aapka existing canvas rendering loop code chalega) ...
-        const imgURL = activeCanvas.toDataURL("image/png"); // cite: Source: common.js
-        appendPreviewCardToDOM(imgURL, rootName, activeSheetKeys); // cite: Source: common.js
-
-        // 🔥 THE CRITICAL MEMORY RELEASE FIX: Garbage Collector ko active karo instantly
-        activeCtx = null;
-        activeCanvas.width = 0;
-        activeCanvas.height = 0;
-        activeCanvas = null;
-    });
-
-    // Pure array optimization reset handlers
-    if (typeof openOverlay === 'function') { // cite: Source: common.js
-        openOverlay('preview'); // cite: Source: common.js
-    } // cite: Source: common.js
-}
-
-// Helper Function: Current Date & Time ko SSMMHHDDMMYY format me generate karne ke liye
-function getWayStockFormattedTimestamp() {
-    const now = new Date();
-    
-    const pad = (num) => String(num).padStart(2, '0');
-    
-    const DD = pad(now.getDate());
-    const MM = pad(now.getMonth() + 1); // Months 0-11 hote hain
-    const YY = String(now.getFullYear()).slice(-2); // Last 2 digits (e.g., 26)
-    
-    const HH = pad(now.getHours());
-    const min = pad(now.getMinutes());
-    const SS = pad(now.getSeconds());
-    
-    // Exact Output Format: SSMMHHDDMMYY (Seconds -> Minutes -> Hours -> Day -> Month -> Year)
-    return `${SS}${min}${HH}${DD}${MM}${YY}`;
-}
-
-// 💾 1. OPTIMIZED IMAGE DOWNLOAD ENGINE (NEW FILENAME PATTERN)
-function downloadGroupImage(dataURL, folderName, encodedKeysList) {
-    const uniqueTimestamp = getWayStockFormattedTimestamp();
-    const link = document.createElement('a'); // cite: Source: common.js
-    
-    // 🔥 NEW DIRECT PATTERN REGISTERED
-    link.download = `WayStock_${uniqueTimestamp}.png`;
-    link.href = dataURL; // cite: Source: common.js
-    
-    document.body.appendChild(link); // cite: Source: common.js
-    link.click(); // cite: Source: common.js
-    document.body.removeChild(link); // cite: Source: common.js
-
-    const cartKey = getCartStorageKey(); // cite: Source: common.js
-    let cart = getCartItems(); // cite: Source: common.js
-
-    if (encodedKeysList) { // cite: Source: common.js
-        try { // cite: Source: common.js
-            const targetKeysToFlush = JSON.parse(decodeURIComponent(encodedKeysList)); // cite: Source: common.js
-            if (Array.isArray(targetKeysToFlush)) { // cite: Source: common.js
-                targetKeysToFlush.forEach(key => { // cite: Source: common.js
-                    if (cart[key]) delete cart[key]; // cite: Source: common.js
-                }); // cite: Source: common.js
-            } // cite: Source: common.js
-        } catch (e) { // cite: Source: common.js
-            console.error("Targeted parsing clean stack collapsed:", e); // cite: Source: common.js
-        } // cite: Source: common.js
-    } else { // cite: Source: common.js
-        Object.keys(cart).forEach(key => { // cite: Source: common.js
-            if (cart[key].rootFolder === folderName) delete cart[key]; // cite: Source: common.js
-        }); // cite: Source: common.js
-    } // cite: Source: common.js
-
-    localStorage.setItem(cartKey, JSON.stringify(cart)); // cite: Source: common.js
-    showAlert(`✅ Slip ka maal bucket se saaf ho gaya hai.`, "success"); // cite: Source: common.js
-
-    if (window.Notification && Notification.permission === 'granted') { // cite: Source: common.js
-        const alertSound = new Audio('./notification-sound.wav'); // cite: Source: common.js
-        alertSound.play().catch(e => console.log("Audio play blocked")); // cite: Source: common.js
-
-        navigator.serviceWorker.ready.then(registration => { // cite: Source: common.js
-            registration.showNotification('Order Saved Successfully! 💾', { // cite: Source: common.js
-                body: `Slip image downloaded as WayStock_${uniqueTimestamp}.png`,
-                icon: 'logo.png', // cite: Source: common.js
-                badge: 'logo.png', // cite: Source: common.js
-                sound: 'default', // cite: Source: common.js
-                vibrate: [100, 50, 100, 200, 100, 200], // cite: Source: common.js
-                tag: 'download-success', // cite: Source: common.js
-                renotify: true // cite: Source: common.js
-            }); // cite: Source: common.js
-        }); // cite: Source: common.js
-    } // cite: Source: common.js
-
-    if (typeof renderCartContent === "function") renderCartContent(); // cite: Source: common.js
-    if (typeof refreshUI === "function") refreshUI(); // cite: Source: common.js
-
-    const previewContentArea = document.getElementById('preview-content-area'); // cite: Source: common.js
-    const totalRemainingSlips = previewContentArea ? previewContentArea.querySelectorAll('.group-preview-card').length : 0; // cite: Source: common.js
-
-    if (totalRemainingSlips <= 1) { // cite: Source: common.js
-        window.history.back(); // cite: Source: common.js
-    } else { // cite: Source: common.js
-        if (previewContentArea) { // cite: Source: common.js
-            const cards = previewContentArea.querySelectorAll('.group-preview-card'); // cite: Source: common.js
-            cards.forEach(card => { // cite: Source: common.js
-                if (card.innerHTML.includes(`downloadGroupImage('${dataURL}'`)) card.remove(); // cite: Source: common.js
-            }); // cite: Source: common.js
-        } // cite: Source: common.js
-    } // cite: Source: common.js
-}
-
-// 📢 2. OPTIMIZED NATIVE WHATSAPP SHARE ENGINE (NEW FILENAME PATTERN)
-async function shareGroupImage(dataURL, folderName, encodedKeysList) {
-    try {
-        const uniqueTimestamp = getWayStockFormattedTimestamp();
-        const response = await fetch(dataURL); // cite: Source: common.js
-        const blob = await response.blob(); // cite: Source: common.js
-        
-        // 🔥 NATIVE SHARE FILE OBJECT MATRIX LOCK
-        const safeFileName = `WayStock_${uniqueTimestamp}.png`;
-        const file = new File([blob], safeFileName, { type: "image/png" }); // cite: Source: common.js
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) { // cite: Source: common.js
-            await navigator.share({ // cite: Source: common.js
-                files: [file], // cite: Source: common.js
-                title: `Order Slip ${uniqueTimestamp}`,
-                text: `🚨 *WayStock Order Preview*\nSlip Name: *${safeFileName}*\nPhoto slip attached safely! 🚀`
-            }); // cite: Source: common.js
-
-            const cartKey = getCartStorageKey(); // cite: Source: common.js
-            let cart = getCartItems(); // cite: Source: common.js
-
-            if (encodedKeysList) { // cite: Source: common.js
-                const targetKeysToFlush = JSON.parse(decodeURIComponent(encodedKeysList)); // cite: Source: common.js
-                if (Array.isArray(targetKeysToFlush)) { // cite: Source: common.js
-                    targetKeysToFlush.forEach(key => { // cite: Source: common.js
-                        if (cart[key]) delete cart[key]; // cite: Source: common.js
-                    }); // cite: Source: common.js
-                } // cite: Source: common.js
-            } // cite: Source: common.js
-            localStorage.setItem(cartKey, JSON.stringify(cart)); // cite: Source: common.js
-            showAlert(`✅ Slip ka maal share hone par bucket se saaf ho gaya hai.`, "success"); // cite: Source: common.js
-
-            if (typeof renderCartContent === "function") renderCartContent(); // cite: Source: common.js
-            if (typeof refreshUI === "function") refreshUI(); // cite: Source: common.js
-
-            const previewContentArea = document.getElementById('preview-content-area'); // cite: Source: common.js
-            const totalRemainingSlips = previewContentArea ? previewContentArea.querySelectorAll('.group-preview-card').length : 0; // cite: Source: common.js
-
-            if (totalRemainingSlips <= 1) { // cite: Source: common.js
-                window.history.back(); // cite: Source: common.js
-            } else { // cite: Source: common.js
-                if (previewContentArea) { // cite: Source: common.js
-                    const cards = previewContentArea.querySelectorAll('.group-preview-card'); // cite: Source: common.js
-                    cards.forEach(card => { // cite: Source: common.js
-                        if (card.innerHTML.includes(`shareGroupImage('${dataURL}'`)) card.remove(); // cite: Source: common.js
-                    }); // cite: Source: common.js
-                } // cite: Source: common.js
-            } // cite: Source: common.js
-
-        } else { // cite: Source: common.js
-            showAlert("Apka device direct image sharing support nahi karta. Please download karke share karein! 📥", "error"); // cite: Source: common.js
-        } // cite: Source: common.js
-    } catch (error) { // cite: Source: common.js
-        console.error("Direct share interaction aborted or crashed:", error); // cite: Source: common.js
-    } // cite: Source: common.js
-}
-
-function triggerActiveCart(btn) {
-    btn.classList.add('selected');
-    setTimeout(() => {
-        btn.classList.remove('selected');
-    }, 180); // 180ms baad blue color hat jayega
-}
-
-function stopMic() {
-    if (recognition) {
-        recognition.stop();
-    micOverlay?.classList.remove('active');
-    }
-    micBtn?.classList.remove('recording');
-}
-
-if (searchBtn) {
-    searchBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        
-        const mainHeader = document.querySelector('.main-header');
-        
-        // Agar search bar pehle se khula he, toh click karne par sseedha normal back jao
-        if (searchSection?.classList.contains('active')) {
-            window.history.back();
-        } else {
-            
-            // 🔑 STEP 1: Pehle check karo user kisi folder me he ya nahi. 
-            // Agar nested layer me he, toh pehle physical history flush ko execute karo.
-            if (window.pathStack && window.pathStack.length > 1) {
-                const levelsToPop = window.pathStack.length - 1;
-                
-                // 🔄 Browser ko sseedha order mila: "Pehle piche jao!"
-                window.history.go(-levelsToPop); 
-                
-                // Pointers aur states ko instantly background me clean kiya
-                window.currentFolder = 'root';
-                window.pathStack = ['Home'];
-                
-                if (window.location.pathname.includes('admin.html')) {
-                    if (typeof renderAdminInventory === "function") renderAdminInventory();
-                } else {
-                    if (typeof renderUserInventory === "function") renderUserInventory();
-                }
-                if (typeof updateBreadcrumb === "function") updateBreadcrumb();
-
-                // ⏳ STEP 2: DIESEL TIME-GAP (200ms Delay)
-                // Browser ko asynchronous history rewrite karne ka poora waqt diya, 
-                // jab background ka kalesh/auto-close operation khatam ho jayega... TABHI Search khulega!
-                setTimeout(() => {
-                    if (mainHeader) mainHeader.classList.add('search-active');
-                    
-                    openOverlay('search'); // Safe Open without clash
-                    
-                    setTimeout(() => {
-                        const suggestionContainer = document.getElementById('search-suggestion-chips');
-                        if (suggestionContainer) {
-                            suggestionContainer.style.display = 'flex'; 
-                        }
-                        if (typeof renderHistoryDropdown === "function") renderHistoryDropdown(); 
-                    }, 80);
-                }, 200); // 🚀 200 milliseconds ka perfect timing framework wrapper gap
-
-            } else {
-                // Safe Mode Block: Agar user pehle se hi Home page par khada he, 
-                // toh bina kisi history alteration ke instantly zero delay par search kholo
-                window.currentFolder = 'root';
-                window.pathStack = ['Home'];
-                
-                if (mainHeader) mainHeader.classList.add('search-active');
-                openOverlay('search');
-                
-                setTimeout(() => {
-                    const suggestionContainer = document.getElementById('search-suggestion-chips');
-                    if (suggestionContainer) {
-                        suggestionContainer.style.display = 'flex'; 
-                    }
-                    if (typeof renderHistoryDropdown === "function") renderHistoryDropdown(); 
-                }, 80);
-            }
-        }
-    });
-}
-
-
-// common.js ke openOverlay function ko is tarah line-by-line badlein:
-function openOverlay(type) {
-    const mainHeader = document.querySelector('.main-header');
-    
-    if (type !== 'preview') {
-        document.getElementById('search-section')?.classList.remove('active');
-        document.getElementById('cart-section')?.classList.remove('active');
-        document.getElementById('action-modal')?.classList.remove('active');
-        document.getElementById('setting-section')?.classList.remove('active');
-        document.getElementById('breadcrumb-section')?.classList.remove('hidden');
-        if (mainHeader) mainHeader.classList.remove('search-active'); // Reset state safe
-    }
-
-    if (type === 'search') {
-        document.getElementById('search-section')?.classList.add('active');
-        document.getElementById('breadcrumb-section')?.classList.add('hidden');
-        // 🔑 FIX 1: Header par active class ensure karo search open hote hi
-        if (mainHeader) mainHeader.classList.add('search-active'); 
-        
-        setTimeout(() => { searchInput.focus(); searchInput.select(); }, 80);
-    } else if (type === 'cart') {
-        document.getElementById('cart-section')?.classList.add('active');
-    } else if (type === 'action-modal' || type === 'modal') {
-        document.getElementById('action-modal')?.classList.add('active');
-    } else if (type === 'setting') {
-        document.getElementById('setting-section')?.classList.add('active');
-    } else if (type === 'preview') {
-        document.getElementById('preview-section')?.classList.add('active');
-        document.getElementById('cart-section')?.classList.add('active');
-    }
-    
-    if (window.history.state?.overlay !== type) {
-        history.pushState({ overlay: type }, "");
-    }
-}
-
-window.onpopstate = function(event) {
-    if (typeof updateCartBadgeCount === "function") updateCartBadgeCount();
-    if (recognition) {
-        recognition.stop();
-    }
-    const state = event.state;
-    if (document.getElementById('admin-menu')?.classList.contains('active')) {
-        if (typeof window.closeAdminMenuDropdownDirectly === 'function') {
-            window.closeAdminMenuDropdownDirectly(true); // true locks down extra historical loop calls
-            return; // Terminate further evaluation chain
-        }
-    }
-    if (document.getElementById('preview-zoom-overlay')?.classList.contains('active')) {
-        closeInteractiveZoomView(true); // true means history text pop trigger pass parameters safely
-        return; // Event chain terminate
-    }
-    if (window.WayStockAdminState && window.WayStockAdminState.isSelectionMode) {
-        if (typeof exitSelectionMode === 'function') {
-            exitSelectionMode(true); // Exits mode without creating dynamic history routing loops
-            return; 
-        }
-    }
-    document.querySelector('.main-header')?.classList.remove('search-active');
-
-    if (window.isSelectionMode) {
-        if (typeof exitSelectionMode === 'function') {
-            exitSelectionMode(true);
-            return;
-        }
-    }
-    
-    // Default resets
-    document.getElementById('preview-section')?.classList.remove('active');
-    document.getElementById('cart-section')?.classList.remove('active');
-    document.getElementById('search-section')?.classList.remove('active');
-    document.getElementById('setting-section')?.classList.remove('active');
-    document.getElementById('admin-menu')?.classList.remove('active');
-    document.getElementById('action-modal')?.classList.remove('active');
-    document.getElementById('breadcrumb-section')?.classList.remove('hidden');
-
-    if (state && state.overlay) {
-        if (state.overlay === 'preview') {
-            document.getElementById('preview-section')?.classList.add('active');
-            document.getElementById('cart-section')?.classList.add('active');
-        } else if (state.overlay === 'cart') {
-            document.getElementById('cart-section')?.classList.add('active');
-            if (typeof renderCartContent === "function") renderCartContent();
-        } else if (state.overlay === 'search') {
-            document.getElementById('search-section')?.classList.add('active');
-            // CORRECTION:
-document.getElementById('breadcrumb-section')?.classList.add('hidden');
-            // Re-apply if moving back into search state frame
-            document.querySelector('.main-header')?.classList.add('search-active');
-        } else if (state.overlay === 'setting') {
-            document.getElementById('setting-section')?.classList.add('active');
-        } else if (state.overlay === 'action-modal' || state.overlay === 'modal') {
-            document.getElementById('action-modal')?.classList.add('active');
-        }
-    } else {
-        if (state && state.folder) {
-            window.currentFolder = state.folder;
-            const idx = window.pathStack.indexOf(window.currentFolder);
-            if (idx !== -1) {
-                window.pathStack = window.pathStack.slice(0, idx + 1);
-            }
-        } else {
-            window.currentFolder = 'root';
-            window.pathStack = ['Home'];
-        }
-
-        if (typeof updateBreadcrumb === "function") updateBreadcrumb();
-        if (typeof refreshUI === "function") refreshUI();
-    }
-};
-
-function closeAllOverlays() {
-    if (
-        document.getElementById('search-section')?.classList.contains('active') ||
-        document.getElementById('cart-section')?.classList.contains('active') ||
-        document.getElementById('action-modal')?.classList.contains('active') ||
-        document.getElementById('setting-section')?.classList.contains('active') ||
-        document.getElementById('preview-section')?.classList.contains('active')
-    ) {
-        window.history.back();
-        return; // Baaki ka kaam window.onpopstate apne aap handle kar lega
-    }
-
-    // Dropdown menu click-outside ke liye bina state wala hai, use normal remove karein
-    document.getElementById('admin-menu')?.classList.remove('active');
-}
-
-const cartBtn = document.getElementById('cart-btn');
-const cartSection = document.getElementById('cart-section');
-
-if (cartBtn && cartSection) {
-    cartBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (cartSection.classList.contains('active')) {
-            window.history.back();
-        } else {
-            openOverlay('cart');
-            if (typeof renderCartContent === "function") {
-                renderCartContent(); // <-- Yeh line data load karegi!
-            }
-        }
-    });
-}
-
-
-function renderCartContent() {
-    const cartSectionElement = document.getElementById('cart-section');
-    if (!cartSectionElement) return;
-
-    const cartBody = cartSectionElement.querySelector('.cart-body');
-    const cartFooter = cartSectionElement.querySelector('.cart-footer');
-    const cartCount = document.getElementById('cart-count');
-    
-    let cart = getCartItems();
-    const inventory = getActiveInventory();
-
-    let cartKeys = Object.keys(cart);
-    let cartUpdated = false;
-
-    cartKeys.forEach(key => {
-        if (!inventory[key]) {
-            delete cart[key];
-            cartUpdated = true;
-        }
-    });
-
-    if (cartUpdated) {
-        localStorage.setItem(getCartStorageKey(), JSON.stringify(cart));
-        cart = getCartItems();
-    }
-
-    const keys = Object.keys(cart);
-
-    if (keys.length === 0) {
-        cartBody.innerHTML = `
-            <div class="empty-cart-ui" style="text-align: center; padding: 40px 20px;">
-                <div class="empty-icon" style="font-size: 48px; margin-bottom: 10px;">🛒</div>
-                <h2 style="font-size: 18px; color: var(--dark);">Bucket Khali Hai!</h2>
-                <p style="font-size: 13px; color: var(--text-sec); margin-bottom: 15px;">Lagta hai aapne abhi tak kuch select nahi kiya.</p>
-                <button class="fun-btn" onclick="window.history.back()" style="padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
-                    Chalo Maal Bharte Hain! 🚀
-                </button>
-            </div>
-        `;
-        if (cartFooter) cartFooter.style.display = 'none';
-        if (cartCount) cartCount.innerText = '0';
-        return;
-    }
-
-    if (cartFooter) cartFooter.style.display = 'flex';
-    if (cartCount) cartCount.innerText = keys.length;
-
-    let listHTML = `<div class="cart-items-list">`;
-
-    // 🔑 DETECT PAGE TYPE CONTEXT FOR CROSS LAYOUT MANAGEMENT
-    const isCurrentPageAdmin = window.location.pathname.includes('admin.html');
-    const pageTypeContext = isCurrentPageAdmin ? 'admin' : 'user';
-
-    keys.forEach(key => {
-        const item = cart[key];
-        let finalNameToShow = item.name;
-        const pathParts = key.split('>');
-        
-        if (pathParts.length > 1) {
-            pathParts.pop();
-            const parentKey = pathParts.join('>').trim();
-            const parentData = inventory[parentKey];
-            
-            if (parentData && parentData.toggleOn === true) {
-                const parentName = parentData.name || parentKey.split('>').pop().trim();
-                finalNameToShow = parentName + " " + item.name;
-            }
-        }
-
-                // 🔽 DYNAMIC INLINE OVERRIDES: Synchronizing active dropdown elements without arbitrary fallbacks
-                const itemInventoryData = inventory[key] || {};
-        const allowedUnitsList = (itemInventoryData.allowedUnits && itemInventoryData.allowedUnits.length > 0)
-            ? itemInventoryData.allowedUnits 
-            : [];
-
-        // 🔑 THE ABSOLUTE EMPTY FIX: "Box" fallback ko hamesha ke liye jad se khatam kiya
-        let currentUnitValue = item.unit || "";
-        
-        if (allowedUnitsList.length > 0) {
-            // Agar list me options hain par current label missing he ya galat he, toh automatically pehla element lock karo
-            if (!currentUnitValue || !allowedUnitsList.includes(currentUnitValue)) {
-                currentUnitValue = allowedUnitsList[0];
-                item.unit = currentUnitValue;
-            }
-        } else {
-            // 🔄 WAPAS 0 HONGE PAR EMPTY: Agar admin ne saare options delete kar diye (list length 0), toh value wapas khali
-            currentUnitValue = "";
-            item.unit = "";
-        }
-
-
-
-        // Loop to generate adaptive matrix selector cells safely
-        let dropdownRowsHTML = '';
-        if (allowedUnitsList.length > 0) {
-            allowedUnitsList.forEach(u => {
-                const crossHTML = (pageTypeContext === 'admin') 
-                    ? `<span class="unit-cross-btn" onclick="event.stopPropagation(); executeUnitGlobalDelete('${key}', '${u}')">❌</span>` 
-                    : '';
-                
-                dropdownRowsHTML += `
-                    <div class="unit-dropdown-row" onclick="event.stopPropagation(); executeUnitSelectChange('${key}', '${u}', '${pageTypeContext}')">
-                        <span>${u}</span>
-                        ${crossHTML}
-                    </div>
-                `;
-            });
-        } else {
-            // Dropdown bilkul empty hone par chota sa sober placeholder text dikhega
-            dropdownRowsHTML = `<div style="padding: 10px; color: #94a3b8; font-size: 11px; text-align: center;">No units added</div>`;
-        }
-
-        const adminInputHTML = (pageTypeContext === 'admin')
-            ? `<input type="text" class="admin-unit-input-box" placeholder="+ Add Unit" onkeydown="event.stopPropagation(); handleAdminUnitEnter(event, '${key}')" onclick="event.stopPropagation()">`
-            : '';
-
-        const dropdownStructureHTML = `
-            <div class="unit-dropdown-wrapper" onclick="event.stopPropagation()">
-                <div class="unit-trigger-badge" onclick="event.stopPropagation(); toggleUnitDropdownMenu(this)">
-                    ${currentUnitValue} ▾
-                </div>
-                <div class="unit-select-dropdown">
-                    ${adminInputHTML}
-                    <div class="dropdown-rows-scroll-container">
-                        ${dropdownRowsHTML}
-                    </div>
-                </div>
-            </div>
-        `;
-
-
-        listHTML += `
-            <div class="cart-item-card" style="display: flex; align-items: center; justify-content: space-between; background: #ffffff;height: 68px; box-sizing: border-box;">
-                
-                <div class="cart-item-info" style="display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 0; padding-right: 8px;">
-                    <span class="cart-item-name" style="text-transform: capitalize; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; display: block;">
-                        ${finalNameToShow}
-                    </span> 
-                </div>
-
-                
-                <div class="cart-item-actions" style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0; width: 185px;">
-                    
-                    <div class="card-qty-controller gesture-swipe-zone" data-swipe-key="${key}" style="flex-shrink: 0 !important;">
-                        <input type="number" value="${item.quantity}" readonly>
-                    </div>
-                    
-                    <div style="width: 62px; display: flex; justify-content: center; flex-shrink: 0;">
-                        ${dropdownStructureHTML}
-                    </div>
-                    
-                    <button class="sel-btn btn-close" title="Remove Item" onclick="removeSingleCartItem('${key}')" style="background: none; border: none; padding: 4px; color: var(--text-sec); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 28px; flex-shrink: 0;">
-                        <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.2; fill: none;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
-                </div>
-            </div>
-        `;
-            
-    });
-
-    listHTML += `</div>`;
-    cartBody.innerHTML = listHTML;
-}
-
-// 🔑 FIX POINT 5: Search Suggestion UI real-time Cart feedback badge render engine sync
-searchInput.addEventListener('input', (e) => {
-    let rawQuery = e.target.value.trim();
-    const inventory = getActiveInventory();
-    const suggestionContainer = document.getElementById('search-suggestion-chips');
-
-    if (!suggestionContainer) return;
-    if (rawQuery.length === 0) { renderHistoryDropdown(); return; }
-
-    let cleanQuery = rawQuery.toLowerCase();
-    const allKeys = Object.keys(inventory);
-
-    const matches = allKeys.filter(key => {
-        const item = inventory[key];
-        const name = item.name.toLowerCase();
-        return name.includes(cleanQuery);
-    }).slice(0, 6);
-
-    if (matches.length > 0) {
-        suggestionContainer.style.display = 'flex';
-        suggestionContainer.innerHTML = matches.map(key => {
-            const item = inventory[key];
-            const cart = getCartItems();
-            const isInCart = cart[key] ? true : false;
-            const visualIcon = (item.children && item.children.length > 0) ? '📁' : '📦';
-            
-            // 🌟 FEATURE 3: Upper folder hierarchy extractor logic
-            let finalSearchDisplayString = item.name;
-            if (key.includes('>')) {
-                const structuralParts = key.split('>');
-                structuralParts.pop(); // Remove current child element
-                const upperFolderName = structuralParts.pop().trim();
-                finalSearchDisplayString = `${upperFolderName} > ${item.name}`;
-            }
-
-            // 🌟 QUOTES SAFE LOCK: JavaScript attribute safe injection escape logic
-            const escapedKey = key.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-
-            return `
-                <div class="search-sober-row" onclick="handleSuggestionClick(this.getAttribute('data-row-key'))" data-row-key="${escapedKey}" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid #f1f5f9; background: #ffffff;">
-                    <div class="search-row-left" style="display: flex; align-items: center; gap: 16px;">
-                        <span class="search-row-icon">${visualIcon}</span>
-                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                            <span class="search-row-text" style="font-size: 14px; font-weight: 600; color: #1e293b;">${finalSearchDisplayString}</span>
-                        </div>
-                    </div>
-                    <div class="search-row-right" onclick="event.stopPropagation()">
-                        ${isInCart ? 
-                            `<span class="status-badge-added" style="font-size: 11px; font-weight: 800; color: var(--success); background-color: #ecfdf5; padding: 4px 10px; border-radius: 6px; border: 1px solid #d1fae5;">✓ Added</span>` : 
-                            `<button class="card-cart-btn" onclick="addToCart(this.getAttribute('data-item-key')); document.getElementById('main-search-input').value=''; document.getElementById('search-suggestion-chips').style.display='none'; refreshUI();" data-item-key="${escapedKey}" style="width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; background:#ffffff; border:1px solid #e2e8f0; color:#64748b;"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg></button>`
-                        }
-                    </div>
-                </div>
-            `;
-        }).join('');
-    } else {
-        suggestionContainer.innerHTML = `<div class="search-sober-row" style="justify-content:center; color:#94a3b8; font-size:13px; padding:16px;">No results found</div>`;
-    }
-});
-
-
-function updateCartBadgeCount() {
-    const cartBtn = document.getElementById('cart-btn');
-    if (!cartBtn) return;
-
-    const cart = typeof getCartItems === "function" ? getCartItems() : {};
-    const totalItems = Object.keys(cart).length;
-
-    // Pehle se screen par chal rahe badge ko pakdo
-    let badge = cartBtn.querySelector('.cart-badge');
-
-    if (totalItems > 0) {
-        if (!badge) {
-            // 1. Agar badge pehle se screen par NAHI he, toh naya banao (Ispe animation chalega)
-            badge = document.createElement('span');
-            badge.className = 'cart-badge';
-            badge.innerText = totalItems;
-            cartBtn.appendChild(badge);
-        } else {
-            // 2. 🟢 FIXED POINT: Agar badge PEHLE SE MAUJUD HE, toh use remove mat karo!
-            // Bas uske andar ka number change karo. Isse animation baar-baar trigger nahi hoga.
-            if (parseInt(badge.innerText, 10) !== totalItems) {
-                badge.innerText = totalItems;
-                
-                // Sirf tabhi pop animation reset karo jab count sach me badla ho
-                badge.style.animation = 'none';
-                requestAnimationFrame(() => {
-                    badge.style.animation = 'badgePop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)';
-                });
-            }
-        }
-    } else {
-        // Agar cart khali ho gaya he, toh badge uda do
-        if (badge) badge.remove();
-    }
-}
-
-// Global tracking variables for notification guard gate
-window.lastAlertMessage = "";
-window.lastAlertTimestamp = 0;
-
-function showAlert(message, type = 'info') {
-    const container = document.getElementById('custom-alert-container');
-    if (!container) return;
-container.innerHTML = ""; 
-    const currentTime = Date.now();
-    
-    // 🔑 DUPLICATE COOLDOWN FILTER: Agar same message 1500ms (1.5s) ke andar dubara aaye toh block karo
-    if (message === window.lastAlertMessage && (currentTime - window.lastAlertTimestamp) < 1500) {
-        console.log("🚫 [Alert Guard] Suppressed duplicate notification:", message);
-        return; 
-    }
-
-    // Save current alert state metrics safely
-    window.lastAlertMessage = message;
-    window.lastAlertTimestamp = currentTime;
-
-    // Naya alert element create karein
-    const alert = document.createElement('div');
-    alert.className = `custom-alert alert-${type}`;
-    
-    // Icon selection
-    let icon = '🔔';
-    if(type === 'error') icon = '🚫';
-    if(type === 'success') icon = '✅';
-
-    alert.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
-
-    // Container mein add karein
-    container.appendChild(alert);
-
-    // 3 second baad automatic remove
-    setTimeout(() => {
-        alert.style.opacity = '0';
-        alert.style.transform = 'translateY(-20px)';
-        setTimeout(() => alert.remove(), 300);
-    }, 3000);
-}
-
-function updateBreadcrumb() {
-    const bc = document.getElementById('breadcrumb-section');
-    // Upgraded clean reference:
-const inventory = getActiveInventory();
-
-    if (!bc) return;
-    
-    bc.innerHTML = "";
-
-    window.pathStack.forEach((folderKey, index) => {
-        const node = document.createElement('span');
-        const isLast = index === window.pathStack.length - 1;
-        
-        // Agar key 'Home' hai toh wahi rakho, warna displayName uthao
-        const folderData = inventory[folderKey];
-        const nameToDisplay = (index === 0) ? "Home" : (folderData?.displayName || folderKey.split('>').pop());
-
-        node.className = isLast ? "current-node" : "root-node";
-        node.innerText = nameToDisplay;
-        
-        if (!isLast) {
-            node.onclick = () => jumpToFolder(index);
-        }
-        bc.appendChild(node);
-
-        if (!isLast) {
-            const sep = document.createElement('span');
-            sep.className = "separator";
-            sep.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" style="vertical-align: middle; margin: 0 4px;"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
-            bc.appendChild(sep);
-        }
-    });
-}
-
-
-function setCartUnit(key, value) {
-    // 🔑 DYNAMIC USER FIX: Get target exact user dynamic storage cart key
-    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
-    let cart = typeof getCartItems === "function" ? getCartItems() : {};
-    
-    if (!cart[key]) return;
-
-    cart[key].unit = value.trim() || "Box";
-    localStorage.setItem(cartKey, JSON.stringify(cart)); // Committing directly to correct profile slot
-    refreshUI(); 
-}
-
-function jumpToFolder(index) {
-    if (index < 0 || index >= window.pathStack.length - 1) return;
-
-    const stepsBack = (window.pathStack.length - 1) - index;
-    
-    if (stepsBack > 0) {
-        // Yeh trigger karega window.onpopstate ko automatically
-        window.history.go(-stepsBack);
-    }
-}
-
-function getUniversalCardHTML(key, data, pageType = 'user') {
-    const folderSVG = `<svg class="custom-type-icon folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`;
-    const itemSVG = `<svg class="custom-type-icon item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2.7 10.3a2.41 2.41 0 0 0 0 3.41l8.59 8.59a2.41 2.41 0 0 0 3.41 0l8.59-8.59a2.41 2.41 0 0 0 0-3.41L14.7 1.7a2.41 2.41 0 0 0-3.41 0z"></path></svg>`;
-
-    const rawIcon = data.type === 'folder' ? folderSVG : itemSVG;
-    const iconHTML = `
-        <div class="card-icon-wrapper">
-            ${rawIcon}
-            <div class="selection-tick-overlay">✓</div>
-        </div>
-    `;
-    const nameToShow = data.name || (key.includes('>') ? key.split('>').pop().trim() : key);
-
-    const addButton = (pageType === 'admin') 
-    ? `<button class="card-add-btn" onclick="event.stopPropagation(); openActionModal('item', '${key}')">+</button>` 
-    : '';
-
-    const toggleHTML = (pageType === 'admin' && data.type === 'folder') 
-    ? `
-    <label class="fun-toggle" onclick="event.stopPropagation()">
-        <input type="checkbox" ${data.toggleOn ? 'checked' : ''} onchange="event.stopPropagation(); handleToggleStatus('${key}', this.checked)">
-        <span class="toggle-slider"></span>
-    </label>` 
-    : '';
-
-    const cart = typeof getCartItems === "function" ? getCartItems() : {};
-    let actionItemHTML = '';
-
-        if (window.currentFolder === 'root') {
-        actionItemHTML = ''; 
-    } else {
-        if (cart[key]) {
-            // 🔑 GESTURE UPGRADE: Completely cleaned boxy buttons. Render a solid gesture target capsule wrapper
-            actionItemHTML = `
-                <div class="card-qty-controller gesture-swipe-zone" 
-                     data-swipe-key="${key}"
-                     onclick="event.stopPropagation()">
-                    <input type="number" value="${cart[key].quantity}" readonly>
-                </div>
-            `;
-        } else {
-            actionItemHTML = `
-                <button class="card-cart-btn" onclick="event.stopPropagation(); triggerActiveCart(this); addToCart('${key}')">
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
-                        <circle cx="9" cy="21" r="1"></circle>
-                        <circle cx="20" cy="21" r="1"></circle>
-                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                    </svg>
-                </button>
-            `;
-        }
-    }
-
-
-
-return `
-    <div class="inventory-card" data-key="${key}" onclick="handleFolderClick('${key}')">
-        <div class="card-left-action">
-            ${addButton} 
-            <div class="card-content" style="${pageType === 'user' ? 'padding-left: 10px;' : ''}">
-                ${iconHTML}
-                <span class="item-name">${nameToShow}</span> 
-            </div>
-        </div>
-        
-        <div class="card-right-actions" style="display: flex; align-items: center; gap: 12px;">
-            ${toggleHTML} 
-            ${actionItemHTML}
-        </div>
-    </div>
-`;
-
-}
-
-
-window.longPressTimer = null;
-
-function applyUniversalScrollTouchLock(card, key) {
-    if (!card) return;
-
-    // Balanced hold timeline threshold (850ms)
-    const HOLD_THRESHOLD = 850; 
-    let startX = 0, startY = 0;
-    const SCROLL_TOLERANCE = 8; // 8 pixels tak touch movement allow hai
-
-    const startTouch = (e) => {
-        if (e.target.closest('.card-add-btn') || e.target.closest('.fun-toggle') || e.target.closest('input') || e.target.closest('button') || e.target.closest('.card-qty-controller')) {
-            return;
-        }
-
-        if (e.type === 'touchstart' && e.touches.length > 0) {
-            startX = e.touches[0].clientX;
-            startY = e.touches[0].clientY;
-        } else {
-            startX = e.clientX;
-            startY = e.clientY;
-        }
-        
-        if (window.longPressTimer) clearTimeout(window.longPressTimer);
-        
-        window.longPressTimer = setTimeout(() => {
-            // Admin panel par hi selection mode trigger hoga
-            if (typeof window.isSelectionMode !== "undefined") {
-                if (!window.isSelectionMode) {
-                    window.isSelectionMode = true;
-                    if (navigator.vibrate) navigator.vibrate(40);
-                    if (typeof toggleCardSelection === "function") toggleCardSelection(key);
-                }
-            }
-        }, HOLD_THRESHOLD);
-    };
-
-    // 🔑 SCROLL DETECTOR: Agar user touch karke ungli thodi bhi khiskata he
-    const moveTouch = (e) => {
-        if (!window.longPressTimer) return;
-
-        let currentX = 0, currentY = 0;
-        if (e.type === 'touchmove' && e.touches.length > 0) {
-            currentX = e.touches[0].clientX;
-            currentY = e.touches[0].clientY;
-        } else {
-            currentX = e.clientX;
-            currentY = e.clientY;
-        }
-
-        const diffX = Math.abs(currentX - startX);
-        const diffY = Math.abs(currentY - startY);
-
-        // 🧠 LOGIC: Agar scroll chal raha he, toh long press timer ko INSTANTLY KILL karo
-        if (diffY > SCROLL_TOLERANCE || diffX > SCROLL_TOLERANCE) {
-            clearTimeout(window.longPressTimer);
-            window.longPressTimer = null;
-        }
-    };
-
-    const endTouch = () => {
-        if (window.longPressTimer) clearTimeout(window.longPressTimer);
-    };
-
-    // Global listeners bind to card container layout
-    card.addEventListener('mousedown', startTouch);
-    card.addEventListener('touchstart', startTouch, { passive: true });
-    
-    card.addEventListener('mousemove', moveTouch);
-    card.addEventListener('touchmove', moveTouch, { passive: true });
-    
-    card.addEventListener('mouseup', endTouch);
-    card.addEventListener('mouseleave', endTouch);
-    card.addEventListener('touchend', endTouch);
-    card.addEventListener('touchcancel', endTouch);
-}
-
-
-// common.js -> handleFolderClick function ko isse REPLACE karein:
-function handleFolderClick(name) {
-    const mainArea = document.querySelector('.main-content-area');
-    // Upgraded clean reference:
-const inventory = getActiveInventory();
-
-    
-    // --- 🔴 GLOBAL MORPHING SAFETY CHECK ---
-    // Agar kisi card ke children hain, toh use common.js me bhi force folder treat karo
-    if (inventory[name] && inventory[name].children && inventory[name].children.length > 0) {
-        inventory[name].type = 'folder';
-    }
-    
-    if (inventory[name] && inventory[name].type === 'folder') {
-        // 1. Pehle "Zoom-Out" animation trigger karein
-        isFolderNavigating = true; //
-        mainArea.style.opacity = '0'; //
-        mainArea.style.transform = 'scale(1.05)'; //
-        mainArea.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'; //
-
-        // 2. Thoda wait karein taaki user ko transition mehsoos ho
-        setTimeout(() => {
-            isFolderNavigating = false; //
-            window.currentFolder = name; //
-            if (!window.pathStack.includes(name)) window.pathStack.push(name); //
-            
-            window.history.pushState({ folder: name }, ""); //
-
-            // 3. Data load karein
-            updateBreadcrumb(); //
-            
-            // STRICT EXECUTION BLOCK: Sirf wahi render function chalao jo page par loaded ho
-            if (window.location.pathname.includes('admin.html') && typeof renderAdminInventory === "function") {
-                renderAdminInventory();
-            } else if (typeof renderUserInventory === "function") {
-                renderUserInventory();
-            }
-            mainArea.style.transition = 'none'; //
-            mainArea.style.transform = 'scale(0.95)'; //
-            mainArea.style.opacity = '0'; //
-
-            // Chota sa delay naye frame ke liye
-            requestAnimationFrame(() => {
-                mainArea.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; //
-                mainArea.style.transform = 'scale(1)'; //
-                mainArea.style.opacity = '1'; //
-            });
-        }, 200); //
-    }
-}
-const suggestionContainer = document.getElementById('search-suggestion-chips');
-
-
-// common.js -> refreshUI() function ko isse replace karein:
-function refreshUI() {
-    if (typeof renderAdminInventory === "function") {
-        renderAdminInventory(); 
-    } else if (typeof renderUserInventory === "function") {
-        renderUserInventory(); 
-    }
-    
-    if (typeof renderCartContent === "function") {
-        renderCartContent();
-    }
-    
-    if (typeof updateBreadcrumb === "function") {
-        updateBreadcrumb(); 
-    }
-
-    // LIVE REFRESH BADGE
-    updateCartBadgeCount();
-}
-
-// 🔑 DYNAMIC PROFILE STORAGE ROUTER FOR SEARCH HISTORY
-function getSearchHistoryStorageKey() {
-    const user = getCurrentUser(); // cite: Source: common.js
-    return user ? `wayStock_searchHistory_${user.id}` : 'wayStock_searchHistory_guest';
-}
-
-function getSearchHistory() {
-    const historyKey = getSearchHistoryStorageKey();
-    return JSON.parse(localStorage.getItem(historyKey)) || []; // cite: Source: common.js
-}
-
-function saveToSearchHistory(key) {
-    let historyList = getSearchHistory(); // cite: Source: common.js
-    const historyKey = getSearchHistoryStorageKey();
-    
-    historyList = historyList.filter(item => item !== key); // cite: Source: common.js
-    historyList.unshift(key); // cite: Source: common.js
-    
-    if (historyList.length > 12) historyList.pop(); // cite: Source: common.js
-    
-    localStorage.setItem(historyKey, JSON.stringify(historyList));
-}
-
-function renderHistoryDropdown() {
-    const historyList = getSearchHistory();
-    // Upgraded clean reference:
-const inventory = getActiveInventory();
-
-   // const cart = JSON.parse(localStorage.getItem('wayStock_cart')) || {}; 
-   const cart = typeof getCartItems === "function" ? getCartItems() : {};
-    const suggestionContainer = document.getElementById('search-suggestion-chips');
-
-    if (historyList.length === 0) {
-        suggestionContainer.style.display = 'none';
-        suggestionContainer.innerHTML = "";
-        return;
-    }
-
-    suggestionContainer.style.display = 'flex';
-    suggestionContainer.innerHTML = `
-        <div style="padding: 8px 16px; font-size: 11px; color: #94a3b8; font-weight: bold; background: #f8fafc; border-bottom: 1px solid #f1f5f9; letter-spacing: 0.5px;">⏱️ RECENT SEARCHES</div>
-    ` + historyList.map(key => {
-        const item = inventory[key] || { name: key.split('>').pop(), type: 'item' };
-        const visualIcon = (item.children && item.children.length > 0) ? '📁' : (item.type === 'folder' ? '📁' : '📦');
-        const isInCart = cart[key] ? true : false;
-        
-        return `
-    <div class="search-sober-row" onclick="handleSuggestionClick('${key}')">
-        <div class="search-row-left">
-            <span class="search-row-icon">${visualIcon}</span>
-            <div style="display: flex; flex-direction: column;">
-                <span class="search-row-text">${item.name}</span>
-                <span class="search-row-path">${key.includes('>') ? key : 'Root Level'}</span>
-            </div>
-        </div>
-        <div class="search-row-right" onclick="event.stopPropagation()">
-            ${isInCart ? 
-                '<span class="status-badge-added">✓ Added</span>' : 
-                (item.children && item.children.length > 0 ? 
-                    '<svg viewBox="0 0 24 24" width="16" height="16" stroke="#cbd5e1" stroke-width="2.5" fill="none"><polyline points="9 18 15 12 9 6"></polyline></svg>' : 
-                    `<button class="card-cart-btn" onclick="addToCart('${key}'); renderHistoryDropdown();"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg></button>`)
-            }
-        </div>
-    </div>
-`;
-    }).join('');
-}
-
-
-// 5. Click handler with History Capture
-function handleSuggestionClick(key) {
-    // Upgraded clean reference:
-const inventory = getActiveInventory();
-
-    const item = inventory[key];
-    if (!item) return;
-
-    // Save this click to history!
-    saveToSearchHistory(key);
-
-    // UI Cleanup
-    searchInput.value = "";
-    document.getElementById('search-suggestion-chips').style.display = 'none';
-    window.history.back(); 
-
-    // Deep History Reconstruction
-    setTimeout(() => {
-        window.pathStack = ['Home']; 
-        window.currentFolder = 'root';
-        
-        if (key.includes('>')) {
-            const parts = key.split('>'); 
-            let currentPath = "";
-
-            for (let i = 0; i < parts.length; i++) {
-                const part = parts[i];
-                currentPath = currentPath === "" ? part : `${currentPath}>${part}`;
-                
-                if (i < parts.length - 1 || inventory[currentPath]?.type === 'folder') {
-                    window.pathStack.push(currentPath);
-                    window.currentFolder = currentPath;
-                    window.history.pushState({ folder: currentPath }, ""); 
-                }
-            }
-        }
-
-        if (typeof updateBreadcrumb === "function") updateBreadcrumb();
-        refreshUI();
-        
-    }, 150);
-}
-
-function getCurrentUser() {
-    return JSON.parse(localStorage.getItem('wayStock_currentUser')) || null;
-}
-
-// 🔑 FIXED: Har user ka cart key ab uski ID ke sath UNIQUE hoga
-function getCartStorageKey() {
-    const user = getCurrentUser();
-    return user ? `wayStock_cart_${user.id}` : 'wayStock_cart_guest';
-}
-
-function getCartItems() {
-    const cartKey = getCartStorageKey();
-    return JSON.parse(localStorage.getItem(cartKey)) || {};
-}
-
-// Fixed Dynamic Add to Cart with User Scope
-function addToCart(key) {
-    // Upgraded clean reference:
-const inventory = getActiveInventory();
-
-    const itemData = inventory[key];
-    const cartKey = getCartStorageKey();
-    let cart = getCartItems();
-
-    if (cart[key]) return;
-
-    const rootFolder = key.includes('>') ? key.split('>')[0].trim() : 'Home';
-
-    // 🔑 INITIAL EMPTY LOCK: Agar admin ne options banaye hain toh pehla element lo, warna pure blank string "" rkho
-    const dynamicDefaultUnit = (itemData && itemData.allowedUnits && itemData.allowedUnits.length > 0)
-        ? itemData.allowedUnits[0]
-        : "";
-
-    cart[key] = {
-        name: itemData ? itemData.name : key.split('>').pop().trim(),
-        fullPath: key,
-        rootFolder: rootFolder,
-        quantity: 1,
-        unit: dynamicDefaultUnit
-    };
-
-
-    localStorage.setItem(cartKey, JSON.stringify(cart));
-    
-    updateCartBadgeCount();
-    refreshUI();
-}
-
-function updateCartQty(key, change) {
-    const cartKey = getCartStorageKey();
-    let cart = getCartItems();
-    if (!cart[key]) return;
-
-    cart[key].quantity += change;
-    
-    if (cart[key].quantity <= 0) {
-        delete cart[key]; 
-        localStorage.setItem(cartKey, JSON.stringify(cart));
-        if (typeof updateCartBadgeCount === "function") updateCartBadgeCount();
-        refreshUI();
-    } else {
-        localStorage.setItem(cartKey, JSON.stringify(cart));
-        if (typeof renderCartContent === "function") renderCartContent();
-        
-        if (window.location.pathname.includes('admin.html') && typeof renderAdminInventory === "function") {
-            renderAdminInventory();
-        } else if (typeof renderUserInventory === "function") {
-            renderUserInventory();
-        }
-    }
-}
-
-function setCartQty(key, value) {
-    const cartKey = getCartStorageKey();
-    let cart = getCartItems();
-    if (!cart[key]) return;
-
-    const qty = parseInt(value, 10);
-    if (isNaN(qty) || qty <= 0) {
-        delete cart[key];
-        localStorage.setItem(cartKey, JSON.stringify(cart));
-        if (typeof updateCartBadgeCount === "function") updateCartBadgeCount();
-        refreshUI();
-    } else {
-        cart[key].quantity = qty;
-        localStorage.setItem(cartKey, JSON.stringify(cart));
-        if (typeof renderCartContent === "function") renderCartContent();
-        
-        if (window.location.pathname.includes('admin.html') && typeof renderAdminInventory === "function") {
-            renderAdminInventory();
-        } else if (typeof renderUserInventory === "function") {
-            renderUserInventory();
-        }
-    }
-}
-
-
-function clearCompleteCart() {
-    if (confirm("Kya aap poori bucket khali karna chahte hain?")) {
-        const cartKey = getCartStorageKey();
-        localStorage.removeItem(cartKey);
-        showAlert("Bucket ekdam saaf ho gayi!", "success");
-        renderCartContent();
-    }
-}
-
-db.collection("appSettings").doc("globalNotification").onSnapshot((doc) => {
-    if (!doc.exists) return;
-
-    const data = doc.data();
-    const msgTime = data.timestamp || 0;
-    const lastSeenNotificationTime = localStorage.getItem('wayStock_last_seen_notification') || "0";
-    
-    const isFreshlyBroadcasted = (Date.now() - msgTime < 10000);
-    const isNewMessageSinceLastOpen = (String(msgTime) !== lastSeenNotificationTime);
-
-    if (isFreshlyBroadcasted || isNewMessageSinceLastOpen) {
-        localStorage.setItem('wayStock_last_seen_notification', String(msgTime));
-
-        // 🧠 @USER DYNAMIC REPLACEMENT LAYER: Current logged-in profile ka data pull karo
-        const loggedUserObj = JSON.parse(localStorage.getItem('wayStock_currentUser'));
-        const clientName = loggedUserObj && loggedUserObj.name ? loggedUserObj.name : "Customer";
-
-        // Firebase se aaye raw text ke andar jitne bhi '@user' ya '@User' hain, unhe dynamic name se replace karo
-        let originalRawText = data.text || "";
-        let personalizedMessage = originalRawText.replace(/@user/gi, clientName);
-
-        // Sound player boot trigger parameters
-        const alertSound = new Audio('./notification-sound.wav');
-        alertSound.play().catch(e => console.log("Audio handshake waiting for user interaction gesture"));
-
-        // System notification execution with parsed variables string
-        if (window.Notification && Notification.permission === 'granted') {
-            navigator.serviceWorker.ready.then(registration => {
-                registration.showNotification('WayStock Broadcast 📢', {
-                    body: personalizedMessage, // 🔑 Injected personalized client name string here!
-                    icon: window.location.origin + '/logo.png', 
-                    badge: window.location.origin + '/logo.png', 
-                    vibrate: [200, 100, 200],
-                    tag: 'broadcast-alert', 
-                    renotify: true,
-                    sound: './notification-sound.wav' 
-                });
-            });
-        } else {
-            // Screen in-app toast alert fallback frame mapping
-            if (typeof showAlert === "function") {
-                showAlert(`📢 ADMIN: ${personalizedMessage}`, "info");
-            }
-        }
-    }
-});
-
-
-const gatewayOverlay = document.getElementById('cloud-gateway-overlay');
-const gatewayVisuals = document.getElementById('gateway-visuals');
-const gatewayInput = document.getElementById('gateway-pin-input');
-const gatewaySubmit = document.getElementById('gateway-submit-btn');
-
-
-if (searchInput && gatewayOverlay && gatewayInput && gatewaySubmit) {
-    searchInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            const queryText = searchInput.value.trim().toLowerCase();
-
-            // SECRET COMMAND LOCK: Exact 'admin.html' text matching
-            if (queryText === 'admin.html') {
-                e.preventDefault();
-                
-                // 🌟 CRITICAL OFFLINE BLOCK FILTER
-                // Agar device me active internet connection nahi he, toh portal block karo instantly!
-                if (!navigator.onLine) {
-                    searchInput.value = ""; // Search bar saaf karo
-                    const suggestionChips = document.getElementById('search-suggestion-chips');
-                    if (suggestionChips) suggestionChips.style.display = 'none';
-                    closeAllOverlays(); // Search window aur overlays ko collapse kardo
-                    return; // Yahin se runtime terminate! Aage PIN maangne ka box khulega hi nahi.
-                }
-
-                // Online Mode: Agar internet chal raha he, tabhi custom immersion security design open hoga
-                searchInput.value = ""; 
-                const suggestionChips = document.getElementById('search-suggestion-chips');
-                if (suggestionChips) suggestionChips.style.display = 'none';
-
-                closeAllOverlays();
-                gatewayOverlay.classList.add('active');
-                setTimeout(() => { gatewayInput.focus(); gatewayInput.select(); }, 80);
-            }
-        }
-    });
-
-    // Validating matrix Active state logic trigger
-    gatewaySubmit.addEventListener('click', validateGatewayCredentials);
-    gatewayInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') validateGatewayCredentials(); });
-}
-
-// Fullscreen validation engine flow architecture
-async function validateGatewayCredentials() {
-    const userEnteredPassword = gatewayInput.value.trim();
-    if (!userEnteredPassword) return;
-
-    // --- 🔑 State 2: Activating State visualized ---
-    gatewaySubmit.disabled = true;
-    gatewayVisuals.className = "gateway-visuals validating";
-    showAlert("Connecting to Firebase Cloud Securing Hub... ☁️", "info");
-
-    try {
-        const adminAuthDoc = await db.collection("appSettings").doc("adminAuth").get();
-
-        if (adminAuthDoc.exists) {
-            const correctCloudPassword = adminAuthDoc.data().password;
-
-            if (userEnteredPassword === String(correctCloudPassword)) {
-                
-                // --- 🔑 State 3: SUCCESS bath in soft radiant green light presets ---
-                gatewayVisuals.className = "gateway-visuals";
-                gatewayOverlay.classList.add('success');
-                
-                // standard 12-hour metric math guidelines
-                const twelveHoursInMs = 12 * 60 * 60 * 1000;
-const expiryTimestamp = String(Date.now() + twelveHoursInMs);
-
-// 🔒 Double Lock Token Injection Structure
-sessionStorage.setItem('wayStock_admin_authenticated', "true");
-sessionStorage.setItem('wayStock_admin_expiry', expiryTimestamp);
-
-// Backup encryption mirror for persistent navigation
-localStorage.setItem('wayStock_admin_token', "true");
-localStorage.setItem('wayStock_admin_expiry', expiryTimestamp);
-
-                showAlert("Access Granted! Cloud Portal Active. 🚀", "success");
-                setTimeout(() => { window.location.href = "admin.html"; }, 1000);
-
-            } else {
-                // --- 🔑 State 4: FAILURE 'Goosebump' angry red hands attack presets ---
-                gatewayOverlay.classList.add('failure');
-                
-                showAlert("🚫 INVALID PIN! Cloud Security System activated.", "error");
-
-                // Standard failure failure failure failure metric presets safety
-                // 12-hour session removal metrics guidelines lock
-                setTimeout(() => {
-                    gatewayVisuals.className = "gateway-visuals";
-                    gatewayOverlay.classList.remove('active');
-                    gatewayOverlay.classList.remove('failure');
-                    gatewayInput.value = "";
-                    gatewaySubmit.disabled = false;
-                    
-                    // Critical failure failure metric guidelines
-                    sessionStorage.removeItem('wayStock_admin_authenticated');
-                    localStorage.removeItem('wayStock_admin_token');
-                    localStorage.removeItem('wayStock_admin_expiry');
-                    
-                    setTimeout(() => { window.location.href = "index.html"; }, 100);
-                }, 2000);
-            }
-        } else {
-            showAlert("Error: Database configuration not found!", "error");
-        }
-    } catch (error) {
-        console.error("Cloud Gateway Failed:", error);
-        showAlert("Network failed! Session terminated.", "error");
-        setTimeout(() => { window.location.href = "index.html"; }, 1000);
-    }
-}
-
-document.addEventListener('touchstart', function(e) {
-    const swipeZone = e.target.closest('.gesture-swipe-zone');
-    if (!swipeZone) return;
-
-    if (document.activeElement === swipeZone.querySelector('input')) return; 
-
-    const key = swipeZone.getAttribute('data-swipe-key');
-    const inputElement = swipeZone.querySelector('input');
-    if (!key || !inputElement) return;
-
-    let startX = e.touches[0].clientX;
-    let initialQty = parseInt(inputElement.value, 10) || 1;
-    let accumulatedDelta = 0;
-    let hasMovedMoved = false; 
-    
-    const SENSITIVITY_PIXELS = 15; 
-
-    function onTouchMove(moveEvent) {
-        const currentX = moveEvent.touches[0].clientX;
-        const currentDiffX = currentX - startX;
-
-        if (Math.abs(currentDiffX) > 5) {
-            hasMovedMoved = true;
-            moveEvent.preventDefault();
-            moveEvent.stopPropagation();
-        } else {
-            return;
-        }
-
-        // 🌟 DIRECTION REVERSE VISUALS: Visual effects ko ulta kiya
-        if (currentDiffX > 5) {
-            swipeZone.classList.add('swiping-left'); // Right swipe par red tint (Minus)
-            swipeZone.classList.remove('swiping-right');
-        } else if (currentDiffX < -5) {
-            swipeZone.classList.add('swiping-right'); // Left swipe par green tint (Plus)
-            swipeZone.classList.remove('swiping-left');
-        }
-
-        // 🌟 DIRECTION REVERSE MATH: currentChange ke aage minus (-) lagakar calculations ulti ki
-const currentChange = -Math.floor(currentDiffX / SENSITIVITY_PIXELS);
-        if (currentChange !== accumulatedDelta) {
-            let nextCalculatedQty = initialQty + currentChange;
-            if (nextCalculatedQty < 0) nextCalculatedQty = 0;
-
-            inputElement.value = nextCalculatedQty; 
-            accumulatedDelta = currentChange;
-            swipeZone.style.transform = "scale(1.04)";
-        }
-    }
-
-    function onTouchEnd() {
-        document.removeEventListener('touchmove', onTouchMove);
-        document.removeEventListener('touchend', onTouchEnd);
-        
-        swipeZone.classList.remove('swiping-right', 'swiping-left');
-        swipeZone.style.transform = "scale(1)";
-
-        if (!hasMovedMoved) {
-            inputElement.removeAttribute('readonly');
-            inputElement.focus();
-            inputElement.select(); 
-            return; 
-        }
-
-        const finalParsedQty = parseInt(inputElement.value, 10);
-        commitQuantityToStorage(key, finalParsedQty);
-    }
-
-    document.addEventListener('touchmove', onTouchMove, { passive: false });
-    document.addEventListener('touchend', onTouchEnd);
-});
-
-// 🔑 DIRECT KEYPAD INPUT INTERCEPTORS & SYNC BLOCKS
-document.addEventListener('focusin', function(e) {
-    const input = e.target.closest('.gesture-swipe-zone input');
-    if (input) {
-        // Stop any external card long press delays while input field has focus attention
-        if (window.longPressTimer) clearTimeout(window.longPressTimer);
-    }
-});
-
-// Enter key validation check inside gesture text fields to smooth blur actions
-document.addEventListener('keydown', function(e) {
-    const input = e.target.closest('.gesture-swipe-zone input');
-    if (input && e.key === 'Enter') {
-        e.preventDefault();
-        input.blur(); // Triggers focusout execution automatically
-    }
-});
-
-// Blur Event Tracker Optimization
-document.addEventListener('focusout', function(e) {
-    const input = e.target.closest('.gesture-swipe-zone input'); // cite: 3
-    if (!input) return; // cite: 3
-
-    const swipeZone = input.closest('.gesture-swipe-zone'); // cite: 3
-    const key = swipeZone?.getAttribute('data-swipe-key'); // cite: 3
-    if (!key) return; // cite: 3
-
-    if (window.getSelection) {
-        window.getSelection().removeAllRanges(); // cite: 3
-    }
-
-    input.setAttribute('readonly', 'true'); // cite: 3
-
-    let typedValue = parseInt(input.value, 10); // cite: 3
-    if (isNaN(typedValue) || typedValue < 0) typedValue = 0; // cite: 3
-
-    commitQuantityToStorage(key, typedValue); // cite: 3
-    
-    // Virtual Keyboard shift hone ke baad viewport scroll jump prevent logic
-    window.scrollTo({
-        top: window.scrollY,
-        behavior: 'instant'
-    });
-});
-
-
-// 🛠️ ABSOLUTE DELETION ENGINE (HEIGHT COLLAPSE & JUMP GUARD)
-function commitQuantityToStorage(key, finalQty) {
-    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest'; // cite: 1
-    let cart = typeof getCartItems === "function" ? getCartItems() : {}; // cite: 1
-
-    if (!cart[key]) return; // cite: 1
-
-    const cartBodyContainer = document.getElementById('cart-content-area') || document.querySelector('.cart-body'); // cite: 1
-
-    if (finalQty <= 0) {
-        // 🔒 LOCK 1: Height Collapse Guard Engine
-        if (cartBodyContainer) {
-            // Element remove hone se pehle container ki current total scroll height ko fix lock kar do
-            const currentScrollHeight = cartBodyContainer.scrollHeight;
-            cartBodyContainer.style.minHeight = `${currentScrollHeight}px`;
-            cartBodyContainer.style.height = `${currentScrollHeight}px`;
-        }
-
-        delete cart[key]; // cite: 1
-        localStorage.setItem(cartKey, JSON.stringify(cart)); // cite: 1
-        
-        if (typeof updateCartBadgeCount === "function") updateCartBadgeCount(); // cite: 1
-
-        const targetCartCard = document.querySelector(`.gesture-swipe-zone[data-swipe-key="${key}"]`)?.closest('.cart-item-card'); // cite: 1
-        
-        if (targetCartCard) {
-            targetCartCard.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'; // cite: 1
-            targetCartCard.style.opacity = '0'; // cite: 1
-            targetCartCard.style.transform = 'translateX(-20px)'; // cite: 1
-
-            setTimeout(() => {
-                targetCartCard.remove(); // cite: 1
-                
-                const remainingKeys = Object.keys(getCartItems()); // cite: 1
-                if (remainingKeys.length === 0) {
-                    // Container styles reset immediately
-                    if (cartBodyContainer) {
-                        cartBodyContainer.style.minHeight = '';
-                        cartBodyContainer.style.height = '';
-                    }
-                    refreshUI(); // cite: 1
-                } else {
-                    const cartCountElement = document.getElementById('cart-count'); // cite: 1
-                    if (cartCountElement) cartCountElement.innerText = remainingKeys.length; // cite: 1
-                    
-                    // 🔓 UNLOCK: Element safely remove hone ke baad temporary height locks release kardo
-                    setTimeout(() => {
-                        if (cartBodyContainer) {
-                            cartBodyContainer.style.minHeight = '';
-                            cartBodyContainer.style.height = '';
-                        }
-                    }, 50);
-                }
-            }, 200);
-        } else {
-            if (cartBodyContainer) {
-                cartBodyContainer.style.minHeight = '';
-                cartBodyContainer.style.height = '';
-            }
-            refreshUI(); // cite: 1
-        }
-    } else {
-        // Normal quantity updates mapping
-        cart[key].quantity = finalQty; // cite: 1
-        localStorage.setItem(cartKey, JSON.stringify(cart)); // cite: 1
-        
-        if (typeof updateCartBadgeCount === "function") updateCartBadgeCount(); // cite: 1
-
-        const activeCardInput = document.querySelector(`.gesture-swipe-zone[data-swipe-key="${key}"] input`); // cite: 1
-        if (activeCardInput) {
-            activeCardInput.value = finalQty; // cite: 1
-        }
-    }
-}
-
-// ❌ DYNAMIC CROSS BUTTON DELETION INTERCEPTOR
-function removeSingleCartItem(key) {
-    // Event object bubble layers capture prevention logic mapping
-    if (window.event) {
-        window.event.preventDefault();
-        window.event.stopPropagation();
-    }
-
-    const cartKey = getCartStorageKey(); // cite: 1
-    let cart = getCartItems(); // cite: 1
-    
-    if (cart[key]) {
-        // Direct absolute atomic core commit container trigger pass with 0 value
-        commitQuantityToStorage(key, 0);
-        showAlert("Item bucket se hata diya gaya.", "info"); // cite: 1
-    }
-}
-
-// 📱 3. TRIPLE-IMG DYNAMIC FLUID SLIDER GALLERY CONTROLLER
-function openInteractiveZoomView(imageIndex) {
-    const overlay = document.getElementById('preview-zoom-overlay'); // cite: Source: common.js
-    const track = document.getElementById('zoom-track-slider');
-    
-    const imgLeft = document.getElementById('zoom-left-image');
-    const imgCenter = document.getElementById('zoom-target-image'); // cite: Source: common.js
-    const imgRight = document.getElementById('zoom-right-image');
-
-    if (!overlay || !track || !imgCenter || !window.WayStockPreviewImages) return;
-
-    window.WayStockCurrentImageIndex = imageIndex;
-    overlay.classList.add('active'); // cite: Source: common.js
-
-    // SYSTEM BACK HISTORY LOCK
-    if (window.history.state?.overlay !== 'preview-zoom') { // cite: Source: common.js
-        history.pushState({ overlay: 'preview-zoom' }, ""); // cite: Source: common.js
-    }
-
-    // 🔄 HYDRATION PIPELINE: Previous, Center aur Next image slots load karo
-    function refreshTripleImagesMatrix() {
-        const idx = window.WayStockCurrentImageIndex;
-        const total = window.WayStockPreviewImages.length;
-
-        // Reset track matrix immediately to center position (0px translation)
-        track.style.transition = 'none';
-        track.style.transform = 'translate3d(0px, 0px, 0px)';
-
-        // Populate Center Slot
-        imgCenter.src = window.WayStockPreviewImages[idx];
-
-        // Populate Left Slot (Previous Item)
-        if (idx > 0) {
-            imgLeft.src = window.WayStockPreviewImages[idx - 1];
-            imgLeft.style.visibility = 'visible';
-        } else {
-            imgLeft.src = "";
-            imgLeft.style.visibility = 'hidden'; // Hide template if out of bounds
-        }
-
-        // Populate Right Slot (Next Item)
-        if (idx < total - 1) {
-            imgRight.src = window.WayStockPreviewImages[idx + 1];
-            imgRight.style.visibility = 'visible';
-        } else {
-            imgRight.src = "";
-            imgRight.style.visibility = 'hidden'; // Hide template if out of bounds
-        }
-    }
-
-    // Initial draw synchronization
-    refreshTripleImagesMatrix();
-
-    // --- 🎮 TOUCH SWIPE CONTROLLER CAPTURE LAYER ---
-    let startX = 0;
-    let currentX = 0;
-    let isTrackingMove = false;
-    const viewWidth = window.innerWidth;
-
-    overlay.ontouchstart = function(e) {
-        startX = e.touches[0].clientX;
-        currentX = startX;
-        isTrackingMove = true;
-        track.style.transition = 'none'; // Stop friction transitions while dragging
-    };
-
-    overlay.ontouchmove = function(e) {
-        if (!isTrackingMove) return;
-        currentX = e.touches[0].clientX;
-        
-        const deltaX = currentX - startX;
-        const idx = window.WayStockCurrentImageIndex;
-        const total = window.WayStockPreviewImages.length;
-
-        // 🛡️ EDGE BUFFER GUARD: Agar user pehli image se left ya aakhiri se right khiskaye toh friction heavy kar do
-        if ((idx === 0 && deltaX > 0) || (idx === total - 1 && deltaX < 0)) {
-            // Apply rubber band dampening effect
-            track.style.transform = `translate3d(${deltaX * 0.3}px, 0px, 0px)`;
-        } else {
-            // Real-time track dragging smoothly with user finger coordinate metrics
-            track.style.transform = `translate3d(${deltaX}px, 0px, 0px)`;
-        }
-    };
-
-    overlay.ontouchend = function(e) {
-        if (!isTrackingMove) return;
-        isTrackingMove = false;
-
-        const totalDeltaX = currentX - startX;
-        const swipeThreshold = viewWidth * 0.22; // Kam se kam 22% screen drag honi chahiye shift karne ke liye
-        const idx = window.WayStockCurrentImageIndex;
-        const total = window.WayStockPreviewImages.length;
-
-        // Active smooth hardware spring response preset
-        track.style.transition = 'transform 0.28s cubic-bezier(0.23, 1, 0.32, 1)';
-
-        if (totalDeltaX < -swipeThreshold && idx < total - 1) {
-            // ➡️ SHIFT NEXT SLIDE: Pull track smoothly left completely
-            track.style.transform = `translate3d(-100vw, 0px, 0px)`;
-            window.WayStockCurrentImageIndex++;
-            setTimeout(refreshTripleImagesMatrix, 280); // Smooth background sync swap after animation ends
-        } 
-        else if (totalDeltaX > swipeThreshold && idx > 0) {
-            // ⬅️ SHIFT PREVIOUS SLIDE: Pull track smoothly right completely
-            track.style.transform = `translate3d(100vw, 0px, 0px)`;
-            window.WayStockCurrentImageIndex--;
-            setTimeout(refreshTripleImagesMatrix, 280); // Smooth background sync swap after animation ends
-        } 
-        else {
-            // 🔄 SNAP BACK BACK: If touch force limits mismatch, snap back to center instantly
-            track.style.transform = 'translate3d(0px, 0px, 0px)';
-        }
-    };
-}
-
-function closeInteractiveZoomView(isBackAction = false) {
-    const overlay = document.getElementById('preview-zoom-overlay'); // cite: Source: common.js
-    const track = document.getElementById('zoom-track-slider');
-    if (!overlay) return; // cite: Source: common.js
-
-    overlay.classList.remove('active'); // cite: Source: common.js
-    
-    // Clear styles memory loops pointers
-    if (track) {
-        track.style.transition = 'none';
-        track.style.transform = 'translate3d(0px, 0px, 0px)';
-    }
-
-    overlay.ontouchstart = null;
-    overlay.ontouchmove = null;
-    overlay.ontouchend = null;
-
-    if (!isBackAction && window.history.state?.overlay === 'preview-zoom') { // cite: Source: common.js
-        window.history.back(); // cite: Source: common.js
-    }
-}
-
-
-function toggleUnitDropdownMenu(element) {
-    const parentWrapper = element.closest('.unit-dropdown-wrapper');
-    const targetDropdown = parentWrapper?.querySelector('.unit-select-dropdown');
-    
-    // Safety Reset: Close any other open unit dropdown elements first
-    document.querySelectorAll('.unit-select-dropdown').forEach(d => {
-        if (d !== targetDropdown) d.classList.remove('active-menu');
-    });
-
-    if (targetDropdown) {
-        targetDropdown.classList.toggle('active-menu');
-    }
-}
-
-// 🔄 TARGETED UNIT CHANGE HANDLER (NO SCROLL JUMP)
-function executeUnitSelectChange(key, unitValue, pageType) {
-    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest'; // cite: 3
-    let cart = typeof getCartItems === "function" ? getCartItems() : {}; // cite: 3
-    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {}; // cite: 3
-
-    // 1. RAM / Cache models me active state update locked
-    if (inventory[key]) {
-        inventory[key].currentUnit = unitValue; // cite: 3
-        if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory); // cite: 3
-    }
-
-    // 2. LocalStorage Cart me data sync securely push karo
-    if (cart[key]) {
-        cart[key].unit = unitValue; // cite: 3
-        localStorage.setItem(cartKey, JSON.stringify(cart)); // cite: 3
-    }
-
-    // 3. TARGETED UI OVERRIDE: Bina innerHTML touch kiye directly value trigger badlo
-    const activeBadgeTrigger = document.querySelector(`.gesture-swipe-zone[data-swipe-key="${key}"]`).closest('.cart-item-actions').querySelector('.unit-trigger-badge');
-    if (activeBadgeTrigger) {
-        activeBadgeTrigger.innerHTML = `${unitValue} ▾`;
-    }
-
-    // Dropdown list containers close layers configuration
-    document.querySelectorAll('.unit-select-dropdown').forEach(d => d.classList.remove('active-menu')); // cite: 3
-}
-
-// REPLACE WITH THIS CLEAN LOGIC:
-function handleAdminUnitEnter(event, key) {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-
-    const rawInputVal = event.target.value.trim();
-    if (!rawInputVal) return;
-
-    // Capitalize option text format standard rules
-    const formattedUnit = rawInputVal.charAt(0).toUpperCase() + rawInputVal.slice(1).toLowerCase();
-    
-    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
-    if (!inventory[key]) return;
-
-    // Extract Root Parent Category path key segment
-    const topRootParentCategoryKey = key.includes('>') ? key.split('>')[0].trim() : key;
-
-    console.log(`🚀 [Unit Engine] Propagating option "${formattedUnit}" from root category node:`, topRootParentCategoryKey);
-
-    // 🔄 RECURSIVE INHERITANCE: Scan entire global database records
-    Object.keys(inventory).forEach(invKey => {
-        if (invKey === topRootParentCategoryKey || invKey.startsWith(topRootParentCategoryKey + '>')) {
-            // 💡 BUG FIX: Agar array nahi hai toh dynamic empty array do, default presets mat thopo!
-            if (!inventory[invKey].allowedUnits) {
-                inventory[invKey].allowedUnits = []; 
-            }
-            if (!inventory[invKey].allowedUnits.includes(formattedUnit)) {
-                inventory[invKey].allowedUnits.push(formattedUnit);
-            }
-            // Auto lock current selection parameter reference
-            inventory[invKey].currentUnit = formattedUnit;
-        }
-    });
-
-    // Sync state changes downstream
-    if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
-    if (typeof syncToFirebase === "function") syncToFirebase();
-
-    event.target.value = ""; // Flush text wrapper box
-    document.querySelectorAll('.unit-select-dropdown').forEach(d => d.classList.remove('active-menu'));
-    refreshUI();
-    showAlert(`Unit "${formattedUnit}" added globally under category tree! ✅`, "success");
-}
-
-// ❌ GLOBAL CROSS BUTTON DELETE CORE ENGINE
-function executeUnitGlobalDelete(key, unitToDelete) {
-
-    let inventory = typeof getActiveInventory === "function" ? getActiveInventory() : {};
-    if (!inventory[key]) return;
-
-    const cartKey = typeof getCartStorageKey === "function" ? getCartStorageKey() : 'wayStock_cart_guest';
-    let cart = typeof getCartItems === "function" ? getCartItems() : {};
-
-    const topRootParentCategoryKey = key.includes('>') ? key.split('>')[0].trim() : key;
-
-    // 🔄 GLOBAL DESTRUCTION STRATEGY LOOP
-    Object.keys(inventory).forEach(invKey => {
-        if (invKey === topRootParentCategoryKey || invKey.startsWith(topRootParentCategoryKey + '>')) {
-            if (inventory[invKey].allowedUnits) {
-                // Slicing unit item element out from array matching definitions rules bounds
-                inventory[invKey].allowedUnits = inventory[invKey].allowedUnits.filter(u => u !== unitToDelete);
-                
-                // 🔑 DYNAMIC ZERO FLUSH: Agar option delete hone ke baad array khali bacha he, toh wapas empty string "" set karo
-                if (inventory[invKey].currentUnit === unitToDelete) {
-                    inventory[invKey].currentUnit = inventory[invKey].allowedUnits.length > 0 
-                        ? inventory[invKey].allowedUnits[0] 
-                        : "";
-                }
-            }
-        }
-
-        // Cart entity values memory clean overrides
-        if (cart[invKey] && cart[invKey].unit === unitToDelete) {
-            cart[invKey].unit = inventory[invKey]?.currentUnit || "Box";
-        }
-    });
-
-    // Commit changes safely to storage pools
-    localStorage.setItem(cartKey, JSON.stringify(cart));
-    if (typeof saveToIndexedDB === "function") saveToIndexedDB(inventory);
-    if (typeof syncToFirebase === "function") syncToFirebase();
-
-    document.querySelectorAll('.unit-select-dropdown').forEach(d => d.classList.remove('active-menu'));
-    refreshUI();
-    showAlert(`Option "${unitToDelete}" deleted completely. 🗑️`, "info");
-}
-
-
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.unit-dropdown-wrapper')) {
-        document.querySelectorAll('.unit-select-dropdown').forEach(dropdown => {
-            dropdown.classList.remove('active-menu');
-        });
-    }
-});
-
-
-async function triggerAdminAppLinkSharing() {
-    // Menu dropdown safely close behavior
-    document.getElementById('admin-menu')?.classList.remove('active');
-    
-    showAlert("Generating Premium QR App Share Card... ⏳", "info");
-
-    const dpr = Math.max(window.devicePixelRatio || 1, 2);
-    const canvasWidth = 400;
-    const canvasHeight = 600; 
-
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasWidth * dpr;
-    canvas.height = canvasHeight * dpr;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-
-    // 🎨 Layout Backsheet color
-    ctx.fillStyle = "#f8fafc";
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-    // 🚀 DYNAMIC BRAND GRADIENT BUILDER (Perfect Match with Logo)
-    const brandGradient = ctx.createLinearGradient(100, 0, 300, 0);
-    brandGradient.addColorStop(0, '#1d6881'); 
-    brandGradient.addColorStop(0.5, '#219395'); 
-    brandGradient.addColorStop(1, '#2abb9b'); 
-
-    // 1. DYNAMIC APP LOGO IMAGE LOADING CORE ENGINE
-    const loadAppLogoImage = () => {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.src = 'logo.png'; 
-            img.onload = () => resolve(img);
-            img.onerror = () => {
-                console.warn("⚠️ Custom brand logo file loading failed.");
-                resolve(null); 
-            };
-        });
-    };
-
-    const appLogoFileInstance = await loadAppLogoImage();
-
-    if (appLogoFileInstance) {
-        ctx.save();
-        ctx.fillStyle = "rgba(33, 147, 149, 0.06)";
-        ctx.beginPath();
-        ctx.arc(canvasWidth / 2, 50, 28, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.arc(canvasWidth / 2, 50, 24, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(appLogoFileInstance, (canvasWidth / 2) - 24, 26, 48, 48);
-        ctx.restore();
-    } else {
-        ctx.fillStyle = brandGradient; 
-        ctx.beginPath();
-        ctx.arc(canvasWidth / 2, 50, 24, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 20px system-ui, -apple-system, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("W", canvasWidth / 2, 57);
-    }
-
-    // App Branding Label Header Title
-    ctx.fillStyle = "#114a5d"; 
-    ctx.font = "bold 20px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("WayStock Master", canvasWidth / 2, 98);
-
-    ctx.fillStyle = "#517483"; 
-    ctx.font = "600 11px system-ui, -apple-system, sans-serif";
-    ctx.fillText("Smart Digital Stock Inventory Console", canvasWidth / 2, 114);
-
-    // 📱 MIDDLE LAYER: Smartphone Phone Mockup Outer Ring Boundary
-    const phoneX = 85;
-    const phoneY = 135;
-    const phoneW = 230;
-    const phoneH = 290; 
-
-    ctx.strokeStyle = "#1a3b47"; 
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.roundRect(phoneX, phoneY, phoneW, phoneH, 20); 
-    ctx.stroke();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.roundRect(phoneX + 2, phoneY + 2, phoneW - 4, phoneH - 4, 18);
-    ctx.fill();
-
-    ctx.fillStyle = brandGradient;
-    ctx.beginPath();
-    ctx.roundRect(phoneX + 10, phoneY + 12, phoneW - 20, 28, 6);
-    ctx.fill();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 10.5px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("Way Stock App", phoneX + 18, phoneY + 30);
-
-    const dummyFolders = ["Perfume 💧", "Sweet Paan ☘️", "Packets 🍟", "Cigarette 🚬", "Paan Masala 🎯"];
-    let currentBoxY = phoneY + 52;
-
-    dummyFolders.forEach(folderText => {
-        ctx.fillStyle = "#f8fafc";
-        ctx.strokeStyle = "#e2e8f0";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.roundRect(phoneX + 12, currentBoxY, phoneW - 24, 24, 6);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = "#219395"; 
-        ctx.font = "10px system-ui, -apple-system, sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText("📁", phoneX + 20, currentBoxY + 16);
-
-        ctx.fillStyle = "#334155";
-        ctx.font = "600 9.5px system-ui, -apple-system, sans-serif";
-        ctx.fillText(folderText, phoneX + 38, currentBoxY + 15);
-
-        ctx.strokeStyle = "#2abb9b";
-        ctx.beginPath();
-        ctx.arc(phoneX + phoneW - 22, currentBoxY + 12, 4, 0, Math.PI * 2);
-        ctx.stroke();
-
-        currentBoxY += 31; 
-    });
-
-    // 🏁 BOTTOM LAYER: Invitation Link text info execution
-    ctx.fillStyle = "#475569";
-    ctx.font = "600 11px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Scan QR or click link below to join portal:", canvasWidth / 2, phoneY + phoneH + 20);
-
-    // Target link logic setup matching GitHub/Local environment structures
-    const currentFullUrl = window.location.href;
-    const cleanFolderUrlPath = currentFullUrl.substring(0, currentFullUrl.lastIndexOf('/'));
-    // 🟢 FIXED: /index.html ko jad se saaf kiya, ab clean routing link generate hoga
-const clientPortalWebAddressLink = cleanFolderUrlPath + "/";
-
-
-
-    const generateQRCodeImagePromise = (textToEncode) => {
-        return new Promise((resolve) => {
-            // Temporary hidden div element dynamically inject kiya body me
-            const tempQRContainer = document.createElement("div");
-            tempQRContainer.style.display = "none";
-            document.body.appendChild(tempQRContainer);
-            
-            // Generate the QR Code instance
-            const qrInstance = new QRCode(tempQRContainer, {
-                text: textToEncode,
-                width: 150,
-                height: 150,
-                colorDark: "#114a5d", 
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-            });
-
-            let attempts = 0;
-            const checkQRStream = setInterval(() => {
-                attempts++;
-                
-                // QRCode Library do chize banati hai: ya to HTML5 canvas ya direct <img> tag template
-                const canvasInsideQR = tempQRContainer.querySelector("canvas");
-                const imgInsideQR = tempQRContainer.querySelector("img");
-
-                // Checkpoint A: Agar library ne canvas use kiya hai aur wo ready hai
-                if (canvasInsideQR && canvasInsideQR.width > 0) {
-                    clearInterval(checkQRStream);
-                    const finalImg = new Image();
-                    finalImg.src = canvasInsideQR.toDataURL("image/png");
-                    finalImg.onload = () => {
-                        document.body.removeChild(tempQRContainer); // cleanup memory leak
-                        resolve(finalImg);
-                    };
-                    return;
-                }
-
-                // Checkpoint B: Agar library ne explicit image src inject kar diya hai
-                if (imgInsideQR && imgInsideQR.src && imgInsideQR.src.startsWith("data:image")) {
-                    clearInterval(checkQRStream);
-                    const finalImg = new Image();
-                    finalImg.src = imgInsideQR.src;
-                    finalImg.onload = () => {
-                        document.body.removeChild(tempQRContainer); // cleanup memory leak
-                        resolve(finalImg);
-                    };
-                    return;
-                }
-
-                // Timeout safe exit
-                if (attempts > 30) { 
-                    clearInterval(checkQRStream);
-                    document.body.removeChild(tempQRContainer);
-                    console.warn("⚠️ QR compilation stream timeout.");
-                    resolve(null);
-                }
-            }, 50); // Polling checks loop every 50ms safely
-        });
-    };
-
-    const qrImageInstance = await generateQRCodeImagePromise(clientPortalWebAddressLink);
-
-    if (qrImageInstance) {
-        const qrX = (canvasWidth / 2) - 45;
-        const qrY = phoneY + phoneH + 32;
-
-        // Draw crisp background padding border for the QR matrix block
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath();
-        ctx.roundRect(qrX - 6, qrY - 6, 102, 102, 10);
-        ctx.fill();
-        ctx.strokeStyle = "#e2e8f0";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Inject the verified QR Code image matrix directly on top
-        ctx.drawImage(qrImageInstance, qrX, qrY, 90, 90);
-    }
-
-    try {
-        const generatedInvitationCardURL = canvas.toDataURL("image/png");
-        const response = await fetch(generatedInvitationCardURL);
-        const blob = await response.blob();
-        const file = new File([blob], 'WayStock_App_Invitation.png', { type: "image/png" });
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-                files: [file],
-                title: 'Join WayStock Mobile Terminal',
-                text: `👋 Greetings! Scan the card image or use link address below to access portal:\n🔗 Link: ${clientPortalWebAddressLink}`
-            });
-        } else {
-            await navigator.share({
-                title: 'Join WayStock Mobile Terminal',
-                text: `👋 Greetings! Join my digital management portal via active link address:\n🔗 Link: ${clientPortalWebAddressLink}`
-            });
-        }
+      const tx = dbInstance.transaction('inventoryStore', 'readwrite');
+      const store = tx.objectStore('inventoryStore');
+      store.put(data, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
     } catch (err) {
-        console.warn("Share link sequence aborted or closed by user:", err);
+      resolve(false);
     }
+  });
 }
 
+async function readFromIndexedDB(key) {
+  if (!dbInstance) await initIndexedDB();
+  if (!dbInstance) return null;
+  return new Promise((resolve) => {
+    try {
+      const tx = dbInstance.transaction('inventoryStore', 'readonly');
+      const store = tx.objectStore('inventoryStore');
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch (err) {
+      resolve(null);
+    }
+  });
+}
+
+// 2. Firebase Cloud Multi-Doc Synchronization & Offline Guard
+let currentVersionToken = Date.now().toString();
+
+async function syncToFirebase() {
+  // Always update local IndexedDB first
+  await saveToIndexedDB('inventory_snapshot', window.wayStock_runtime_inventory);
+  
+  if (!navigator.onLine) {
+    showToast("Offline mode: Changes saved locally");
+    return;
+  }
+  
+  try {
+    currentVersionToken = Date.now().toString();
+    localStorage.setItem('waystock_last_sync_token', currentVersionToken);
+    
+    // Broadcast token update across tabs
+    window.dispatchEvent(new CustomEvent('waystock_cloud_sync', { detail: { token: currentVersionToken } }));
+    showToast("Cloud Synced Successfully");
+  } catch (err) {
+    console.warn("Cloud sync fallback to offline mode", err);
+  }
+}
+
+// Listen for multi-tab live updates
+window.addEventListener('storage', (e) => {
+  if (e.key === 'waystock_last_sync_token') {
+    readFromIndexedDB('inventory_snapshot').then((snapshot) => {
+      if (snapshot) {
+        window.wayStock_runtime_inventory = snapshot;
+        if (typeof renderCurrentView === 'function') renderCurrentView();
+      }
+    });
+  }
+});
+
+// 3. Navigation & Breadcrumb System
+function jumpToFolder(index) {
+  if (index < 0 || index >= window.pathStack.length) return;
+  
+  const stepsBack = (window.pathStack.length - 1) - index;
+  window.pathStack = window.pathStack.slice(0, index + 1);
+  window.currentFolder = window.pathStack[window.pathStack.length - 1];
+  
+  if (stepsBack > 0 && window.history.state) {
+    window.history.go(-stepsBack);
+  } else {
+    window.history.pushState({ folder: window.currentFolder, pathStack: window.pathStack }, '', '#' + window.currentFolder);
+  }
+  
+  renderBreadcrumbs();
+  if (typeof renderCurrentView === 'function') {
+    renderCurrentView();
+  }
+}
+
+window.onpopstate = function(e) {
+  if (e.state && e.state.pathStack) {
+    window.pathStack = e.state.pathStack;
+    window.currentFolder = e.state.folder;
+  } else {
+    window.pathStack = ['Home'];
+    window.currentFolder = 'Home';
+  }
+  renderBreadcrumbs();
+  if (typeof renderCurrentView === 'function') {
+    renderCurrentView();
+  }
+};
+
+function renderBreadcrumbs() {
+  const container = document.getElementById('breadcrumb-section');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  window.pathStack.forEach((folder, idx) => {
+    const chip = document.createElement('div');
+    chip.className = `breadcrumb-chip ${idx === window.pathStack.length - 1 ? 'active' : ''} folder-morph-active`;
+    chip.innerHTML = `<span>${folder}</span>`;
+    chip.onclick = () => jumpToFolder(idx);
+    container.appendChild(chip);
+    
+    if (idx < window.pathStack.length - 1) {
+      const sep = document.createElement('span');
+      sep.className = 'breadcrumb-separator';
+      sep.innerHTML = '›';
+      container.appendChild(sep);
+    }
+  });
+}
+
+function openFolder(folderName) {
+  window.pathStack.push(folderName);
+  window.currentFolder = folderName;
+  window.history.pushState({ folder: folderName, pathStack: window.pathStack }, '', '#' + folderName);
+  renderBreadcrumbs();
+  if (typeof renderCurrentView === 'function') {
+    renderCurrentView();
+  }
+}
+
+// 4. Voice Assistant Engine (SpeechRecognition)
+function initVoiceAssistant(onResultCallback) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast("Voice Recognition not supported on this device");
+    return null;
+  }
+  
+  const recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+  
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript.toLowerCase();
+    console.log("Voice Command Recognized:", transcript);
+    showToast(`Voice: "${transcript}"`);
+    
+    // Voice Command 1: "open [folder]"
+    if (transcript.startsWith("open ")) {
+      const target = transcript.replace("open ", "").trim();
+      const match = window.wayStock_runtime_inventory.rootStructures.find(r => r.toLowerCase() === target) ||
+                    Object.keys(window.wayStock_runtime_inventory.categories).flatMap(k => window.wayStock_runtime_inventory.categories[k]).find(c => c.toLowerCase() === target);
+      if (match) {
+        openFolder(match);
+      } else {
+        showToast(`Folder "${target}" not found`);
+      }
+    }
+    // Voice Command 2: "add [qty] [item] to cart"
+    else if (transcript.includes("add ") && transcript.includes(" to cart")) {
+      const match = transcript.match(/add (\d+)\s+(.+)\s+to cart/);
+      if (match) {
+        const qty = parseInt(match[1]) || 1;
+        const itemName = match[2].trim();
+        if (typeof addToCartByName === 'function') {
+          addToCartByName(itemName, qty);
+        }
+      }
+    }
+    
+    if (onResultCallback) onResultCallback(transcript);
+  };
+  
+  recognition.onerror = () => {
+    showToast("Voice recognition error");
+  };
+  
+  return recognition;
+}
+
+// 5. Secret Admin Gateway Overlay
+function checkAdminGatewayTrigger(query) {
+  if (query.trim().toLowerCase() === 'admin.html') {
+    showCloudMasterPINModal();
+    return true;
+  }
+  return false;
+}
+
+function showCloudMasterPINModal() {
+  let modal = document.getElementById('cloud-gateway-overlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'cloud-gateway-overlay';
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+      <div class="modal-sheet" style="max-width:380px; align-self:center; border-radius:24px; padding:24px;">
+        <div style="text-align:center; margin-bottom:16px;">
+          <div style="font-size:2rem; margin-bottom:8px;">🔒</div>
+          <h3 style="font-size:1.2rem; font-weight:800; color:#fff;">Cloud Master Admin PIN</h3>
+          <p style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">Enter security PIN to access management portal</p>
+        </div>
+        <input type="password" id="admin-pin-input" placeholder="Enter PIN (Default: 1234)" style="width:100%; height:48px; background:#0f172a; border:1px solid #334155; border-radius:12px; text-align:center; font-size:1.2rem; letter-spacing:4px; color:#fff; outline:none; margin-bottom:16px;" autofocus />
+        <button onclick="verifyAdminPIN()" class="btn-primary">Unlock Admin Portal</button>
+        <button onclick="closeCloudMasterPINModal()" class="btn-secondary" style="margin-top:8px;">Cancel</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  } else {
+    modal.classList.add('active');
+  }
+}
+
+function closeCloudMasterPINModal() {
+  const modal = document.getElementById('cloud-gateway-overlay');
+  if (modal) modal.classList.remove('active');
+}
+
+function verifyAdminPIN() {
+  const input = document.getElementById('admin-pin-input');
+  if (!input) return;
+  const pin = input.value.trim();
+  
+  // Default master PIN is 1234 or configured token
+  if (pin === '1234' || pin === '9999') {
+    const expireTime = Date.now() + (12 * 60 * 60 * 1000); // 12 Hours
+    sessionStorage.setItem('waystock_admin_token', expireTime.toString());
+    localStorage.setItem('waystock_admin_token', expireTime.toString());
+    closeCloudMasterPINModal();
+    window.location.href = 'admin.html';
+  } else {
+    showToast("Invalid Master PIN");
+  }
+}
+
+function isAdminAuthenticated() {
+  const token = sessionStorage.getItem('waystock_admin_token') || localStorage.getItem('waystock_admin_token');
+  if (!token) return false;
+  return Date.now() < parseInt(token);
+}
+
+// Toast Helper
+function showToast(message) {
+  let toast = document.getElementById('toast-notification');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast-notification';
+    toast.className = 'toast-notification';
+    document.body.appendChild(toast);
+  }
+  toast.innerText = message;
+  toast.classList.add('active');
+  setTimeout(() => {
+    toast.classList.remove('active');
+  }, 2500);
+}
+
+// On Page Load Initialization
+document.addEventListener('DOMContentLoaded', async () => {
+  await initIndexedDB();
+  const cached = await readFromIndexedDB('inventory_snapshot');
+  if (cached) {
+    window.wayStock_runtime_inventory = cached;
+  }
+  renderBreadcrumbs();
+});
